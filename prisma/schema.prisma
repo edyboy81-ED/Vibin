@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Add or rename values here to match your actual client companies.
+// Run `prisma migrate dev --name rename-companies` after any changes.
+enum Company {
+  PRESTIGE
+  HARMONY
+  RHYTHM
+  MELODY
+  ENCORE
+}
+
+model Job {
+  id        String    @id @default(cuid())
+  jobNumber String
+  company   Company
+  // null means the job was entered without a name; display jobNumber instead
+  name      String?
+  date      DateTime?
+  amount    Int // stored in cents; displayed as dollars / 100
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([jobNumber, company])
+}
+
+model Receipt {
+  id          String   @id @default(cuid())
+  jobNumber   String
+  company     Company
+  amount      Int // stored in cents
+  date        DateTime
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
