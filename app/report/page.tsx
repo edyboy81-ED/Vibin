@@ -240,23 +240,23 @@ function LastWeekTable({ rows }: { rows: LastWeekStatusRow[] }) {
     <table className="w-full text-xs">
       <thead>
         <tr className="border-b border-gray-100">
-          <th className="pb-2 text-left font-medium text-gray-400 uppercase tracking-wide">Job #</th>
-          <th className="pb-2 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
-          <th className="pb-2 text-left font-medium text-gray-400 uppercase tracking-wide">Est #</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job #</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Est #</th>
           <th className="pb-2 text-right font-medium text-gray-400 uppercase tracking-wide">Amount</th>
-          <th className="pb-2 text-left font-medium text-gray-400 uppercase tracking-wide">Division</th>
-          <th className="pb-2 text-left font-medium text-gray-400 uppercase tracking-wide">Status</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Division</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Status</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50">
         {rows.map((r, i) => (
           <tr key={i}>
-            <td className="py-2 pr-4 font-mono">{r.jobNumber}</td>
-            <td className="py-2 pr-4 text-gray-700">{r.jobName}</td>
-            <td className="py-2 pr-4 text-gray-500">{r.estimateNumber}</td>
-            <td className="py-2 pr-4 text-right font-mono">{dollars(r.estimatedAmountOwed)}</td>
-            <td className="py-2 pr-4 text-gray-500">{r.division}</td>
-            <td className="py-2">
+            <td className="py-2 px-3 font-mono">{r.jobNumber}</td>
+            <td className="py-2 px-3 text-gray-700">{r.jobName}</td>
+            <td className="py-2 px-3 text-gray-500">{r.estimateNumber}</td>
+            <td className="py-2 px-3 text-right font-mono">{dollars(r.estimatedAmountOwed)}</td>
+            <td className="py-2 px-3 text-gray-500">{r.division}</td>
+            <td className="py-2 px-3">
               <span className="px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: r.statusColor + '22', color: r.statusColor }}>
                 {r.statusName}
               </span>
@@ -273,21 +273,21 @@ function UnplannedTable({ rows }: { rows: UnplannedReceiptRow[] }) {
     <table className="w-full text-xs">
       <thead>
         <tr className="border-b border-gray-100">
-          <th className="pb-2 text-left font-medium text-gray-400 uppercase tracking-wide">Job #</th>
-          <th className="pb-2 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
-          <th className="pb-2 text-left font-medium text-gray-400 uppercase tracking-wide">Division</th>
-          <th className="pb-2 text-left font-medium text-gray-400 uppercase tracking-wide">Date</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job #</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Division</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Date</th>
           <th className="pb-2 text-right font-medium text-gray-400 uppercase tracking-wide">Amount</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50">
         {rows.map((r, i) => (
           <tr key={i}>
-            <td className="py-2 pr-4 font-mono">{r.jobNumber}</td>
-            <td className="py-2 pr-4 text-gray-700">{r.jobName}</td>
-            <td className="py-2 pr-4 text-gray-500">{r.division}</td>
-            <td className="py-2 pr-4 text-gray-500">{r.datePmtReceived}</td>
-            <td className="py-2 text-right font-mono">{dollars(r.amountReceived)}</td>
+            <td className="py-2 px-3 font-mono">{r.jobNumber}</td>
+            <td className="py-2 px-3 text-gray-700">{r.jobName}</td>
+            <td className="py-2 px-3 text-gray-500">{r.division}</td>
+            <td className="py-2 px-3 text-gray-500">{r.datePmtReceived}</td>
+            <td className="py-2 px-3 text-right font-mono">{dollars(r.amountReceived)}</td>
           </tr>
         ))}
       </tbody>

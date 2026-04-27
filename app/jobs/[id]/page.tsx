@@ -296,10 +296,10 @@ export default function JobDetailPage() {
             <tbody className="divide-y divide-gray-50">
               {job.projections.map(p => (
                 <tr key={p.id}>
-                  <td className="py-3 pr-4 font-mono text-xs">{p.estimateNumber}</td>
-                  <td className="py-3 pr-4 text-right font-mono">{dollars(p.estimatedAmountOwed)}</td>
-                  <td className="py-3 pr-4">{fmtDate(p.estimatedPaymentDate)}</td>
-                  <td className="py-3 pr-4">
+                  <td className="py-3 px-3 font-mono text-xs">{p.estimateNumber}</td>
+                  <td className="py-3 px-3 text-right font-mono">{dollars(p.estimatedAmountOwed)}</td>
+                  <td className="py-3 px-3">{fmtDate(p.estimatedPaymentDate)}</td>
+                  <td className="py-3 px-3">
                     <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: p.status.color + '22', color: p.status.color }}>
                       {p.status.name}
                     </span>
