@@ -20,7 +20,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-gray-50 min-h-screen`}>
+      <body className={`${inter.className} bg-gray-50 min-h-screen`} suppressHydrationWarning>
         {isAuthenticated && (
           <nav className="bg-slate-900 text-white px-6 py-0 flex items-stretch gap-1 shadow-lg">
             <span className="font-bold text-lg tracking-tight flex items-center pr-6 border-r border-slate-700 mr-2">
