@@ -76,6 +76,12 @@ export default function JobsPage() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-900">Cash Receipts</h1>
         <div className="flex gap-2">
+          <Link
+            href="/import"
+            className="text-sm border border-gray-300 bg-white px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Import CSV
+          </Link>
           <a
             href="/api/jobs/export"
             className="text-sm border border-gray-300 bg-white px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
