@@ -1,44 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { Prisma } from '@prisma/client'
+import { getDivision } from '@/lib/companies'
 
 export async function GET() {
-  const jobs = await prisma.job.findMany({ orderBy: { createdAt: 'desc' } })
+  const jobs = await prisma.job.findMany({
+    orderBy: { jobNumber: 'asc' },
+    include: {
+      payments: { orderBy: { datePmtReceived: 'desc' }, take: 1 },
+      _count: { select: { projections: true } },
+    },
+  })
   return NextResponse.json(jobs)
 }
 
 export async function POST(req: NextRequest) {
-  let body: unknown
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
+  const body = await req.json()
+  const { jobNumber, jobName, company, jobStatus, paidThruDate, billedThruDate, nextAmountDue, notes } = body
 
-  const { jobNumber, company, name, date, amount, notes } = body as Record<string, unknown>
-
-  if (!jobNumber || !company || typeof amount !== 'number') {
-    return NextResponse.json({ error: 'jobNumber, company, and amount are required' }, { status: 400 })
+  if (!jobNumber || !jobName || !company) {
+    return NextResponse.json({ error: 'jobNumber, jobName, and company are required' }, { status: 400 })
   }
 
   try {
     const job = await prisma.job.create({
       data: {
-        jobNumber: String(jobNumber),
-        company: company as never, // validated by Prisma enum; bad values throw P2009
-        name: name ? String(name) : null,
-        date: date ? new Date(String(date)) : null,
-        amount: Math.round(Number(amount)),
+        jobNumber: String(jobNumber).trim(),
+        jobName: String(jobName).trim(),
+        company: String(company),
+        division: getDivision(String(company)),
+        jobStatus: jobStatus ?? 'IN_PROGRESS',
+        paidThruDate: paidThruDate ? new Date(paidThruDate) : null,
+        billedThruDate: billedThruDate ? new Date(billedThruDate) : null,
+        nextAmountDue: nextAmountDue != null ? Math.round(Number(nextAmountDue)) : null,
         notes: notes ? String(notes) : null,
       },
     })
     return NextResponse.json(job, { status: 201 })
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-      return NextResponse.json(
-        { error: 'A job with this number and company already exists' },
-        { status: 409 },
-      )
+  } catch (err: any) {
+    if (err.code === 'P2002') {
+      return NextResponse.json({ error: 'A job with this number already exists' }, { status: 409 })
     }
     throw err
   }

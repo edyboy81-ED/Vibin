@@ -9,8 +9,8 @@ import LogoutButton from './components/LogoutButton'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Vibin',
-  description: 'Job tracking & reconciliation',
+  title: 'Vibin AR',
+  description: 'Accounts receivable cash flow management',
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -22,27 +22,33 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <body className={`${inter.className} bg-gray-50 min-h-screen`}>
         {isAuthenticated && (
-          <nav className="bg-indigo-700 text-white px-6 py-3 flex items-center gap-6 shadow">
-            <span className="font-bold text-lg tracking-tight">Vibin</span>
-            <Link href="/" className="text-sm hover:text-indigo-200 transition-colors">
-              Dashboard
-            </Link>
-            <Link href="/jobs" className="text-sm hover:text-indigo-200 transition-colors">
-              Jobs
-            </Link>
-            <Link href="/receipts" className="text-sm hover:text-indigo-200 transition-colors">
-              Receipts
-            </Link>
-            <Link href="/reconciliation" className="text-sm hover:text-indigo-200 transition-colors">
-              Reconciliation
-            </Link>
-            <div className="ml-auto">
+          <nav className="bg-slate-900 text-white px-6 py-0 flex items-stretch gap-1 shadow-lg">
+            <span className="font-bold text-lg tracking-tight flex items-center pr-6 border-r border-slate-700 mr-2">
+              Vibin AR
+            </span>
+            <NavLink href="/">Dashboard</NavLink>
+            <NavLink href="/jobs">Cash Receipts</NavLink>
+            <NavLink href="/projections">Projections</NavLink>
+            <NavLink href="/report">Friday Report</NavLink>
+            <NavLink href="/settings">Settings</NavLink>
+            <div className="ml-auto flex items-center">
               <LogoutButton />
             </div>
           </nav>
         )}
-        <main className="p-6">{children}</main>
+        <main className="p-6 max-w-screen-xl mx-auto">{children}</main>
       </body>
     </html>
+  )
+}
+
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="text-sm text-slate-300 hover:text-white hover:bg-slate-800 px-4 flex items-center transition-colors"
+    >
+      {children}
+    </Link>
   )
 }

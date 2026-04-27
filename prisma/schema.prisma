@@ -7,38 +7,84 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Add or rename values here to match your actual client companies.
-// Run `prisma migrate dev --name rename-companies` after any changes.
-enum Company {
-  PRESTIGE
-  HARMONY
-  RHYTHM
-  MELODY
-  ENCORE
-}
-
 model Job {
-  id        String    @id @default(cuid())
-  jobNumber String
-  company   Company
-  // null means the job was entered without a name; display jobNumber instead
-  name      String?
-  date      DateTime?
-  amount    Int // stored in cents; displayed as dollars / 100
-  notes     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  jobNumber      String    @unique
+  jobName        String
+  company        String
+  division       String    // "LEGACY" | "AB"
+  jobStatus      String    @default("IN_PROGRESS") // "IN_PROGRESS" | "CLOSED"
+  paidThruDate   DateTime?
+  billedThruDate DateTime?
+  nextAmountDue  Int?      // cents
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  @@unique([jobNumber, company])
+  payments    Payment[]
+  projections ProjectedPayment[]
 }
 
-model Receipt {
+model Payment {
+  id              String    @id @default(cuid())
+  jobId           String
+  job             Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  datePmtReceived DateTime
+  amountReceived  Int       // cents
+  paidThruDate    DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+}
+
+model ProjectionStatus {
   id          String   @id @default(cuid())
-  jobNumber   String
-  company     Company
-  amount      Int // stored in cents
-  date        DateTime
-  description String?
+  name        String   @unique
+  color       String   @default("#6b7280")
+  isSystem    Boolean  @default(false)
+  sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  projections ProjectedPayment[]
+}
+
+model ProjectedPayment {
+  id                   String           @id @default(cuid())
+  jobId                String?
+  job                  Job?             @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  jobNumber            String
+  jobName              String
+  company              String
+  division             String           // "LEGACY" | "AB"
+  monthYear            String           // e.g. "04/2026"
+  estimateNumber       String
+  billingPeriod        String           // e.g. "2/1/26-2/28/26"
+  estimatedAmountOwed  Int              // cents
+  estimatedPaymentDate DateTime
+  statusId             String
+  status               ProjectionStatus @relation(fields: [statusId], references: [id])
+  isActive             Boolean          @default(true)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  notes     ProjectionNote[]
+  movements ProjectionMovement[]
+}
+
+model ProjectionNote {
+  id           String           @id @default(cuid())
+  projectionId String
+  projection   ProjectedPayment @relation(fields: [projectionId], references: [id], onDelete: Cascade)
+  content      String
+  createdAt    DateTime         @default(now())
+}
+
+model ProjectionMovement {
+  id           String           @id @default(cuid())
+  projectionId String
+  projection   ProjectedPayment @relation(fields: [projectionId], references: [id], onDelete: Cascade)
+  fromDate     DateTime
+  toDate       DateTime
+  reason       String?
+  createdAt    DateTime         @default(now())
 }

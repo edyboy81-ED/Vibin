@@ -1,112 +1,106 @@
 import { prisma } from '@/lib/db'
-import { reconcile } from '@/lib/reconcile'
+import { dollars, fmtDate, daysSince, nextFriday } from '@/lib/format'
 import Link from 'next/link'
 
-function dollars(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`
-}
-
 export default async function DashboardPage() {
-  const [jobs, receipts] = await Promise.all([
-    prisma.job.findMany({ orderBy: { createdAt: 'desc' } }),
-    prisma.receipt.findMany({ orderBy: { date: 'desc' } }),
+  const today = new Date()
+  const friday = nextFriday(today)
+
+  const [jobs, payments, projections] = await Promise.all([
+    prisma.job.count(),
+    prisma.payment.findMany({
+      where: {
+        datePmtReceived: {
+          gte: new Date(Date.now() - 7 * 86_400_000),
+        },
+      },
+      include: { job: { select: { division: true } } },
+    }),
+    prisma.projectedPayment.findMany({
+      where: { isActive: true },
+      include: { status: true },
+    }),
   ])
 
-  const result = reconcile(jobs, receipts)
+  const weekLegacy = payments.filter(p => p.job.division === 'LEGACY').reduce((s, p) => s + p.amountReceived, 0)
+  const weekAB = payments.filter(p => p.job.division === 'AB').reduce((s, p) => s + p.amountReceived, 0)
 
-  const totalExpected = jobs.reduce((s, j) => s + j.amount, 0)
-  const totalReceived = receipts.reduce((s, r) => s + r.amount, 0)
-  const pendingAmount = result.unmatchedJobs.reduce((s, j) => s + j.amount, 0)
-  const unmatchedReceiptsAmount = result.unmatchedReceipts.reduce((s, r) => s + r.amount, 0)
+  const nextWeekEnd = new Date(friday.getTime() + 7 * 86_400_000)
+  const nextWeekProjections = projections.filter(p => new Date(p.estimatedPaymentDate) <= nextWeekEnd)
+  const futureProjections = projections.filter(p => new Date(p.estimatedPaymentDate) > nextWeekEnd)
+
+  const nextWeekTotal = nextWeekProjections.reduce((s, p) => s + p.estimatedAmountOwed, 0)
+  const futureTotal = futureProjections.reduce((s, p) => s + p.estimatedAmountOwed, 0)
+
+  const projectedCount = projections.filter(p => p.status.name === 'Projected').length
+  const partialCount = projections.filter(p => p.status.name === 'Partial').length
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6 text-gray-900">Dashboard</h1>
-
-      {/* Top stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Jobs" value={jobs.length.toString()} />
-        <StatCard label="Receipts" value={receipts.length.toString()} />
-        <StatCard label="Expected" value={dollars(totalExpected)} mono />
-        <StatCard label="Received" value={dollars(totalReceived)} mono />
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">Next report: {fmtDate(friday)}</p>
+        </div>
+        <Link
+          href="/report"
+          className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors"
+        >
+          Build Friday Report →
+        </Link>
       </div>
 
-      {/* Reconciliation status */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <StatusCard
-          label="Matched"
-          count={result.matched.length}
-          sub={`${dollars(result.matched.reduce((s, m) => s + m.receipt.amount, 0))} received`}
-          color="green"
-        />
-        <StatusCard
-          label="Pending Payment"
-          count={result.unmatchedJobs.length}
-          sub={`${dollars(pendingAmount)} outstanding`}
-          color="yellow"
-        />
-        <StatusCard
-          label="Unmatched Receipts"
-          count={result.unmatchedReceipts.length}
-          sub={`${dollars(unmatchedReceiptsAmount)} unlinked`}
-          color="red"
-        />
+      {/* This week receipts */}
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">This Week's Cash Receipts</h2>
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        <StatCard label="Legacy" value={dollars(weekLegacy)} sub={`${payments.filter(p => p.job.division === 'LEGACY').length} payments`} color="blue" />
+        <StatCard label="AB" value={dollars(weekAB)} sub={`${payments.filter(p => p.job.division === 'AB').length} payments`} color="blue" />
+        <StatCard label="Combined" value={dollars(weekLegacy + weekAB)} sub="total received" color="green" />
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <Link
-          href="/reconciliation"
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium transition-colors"
-        >
-          View Reconciliation
-        </Link>
-        <Link
-          href="/jobs"
-          className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors"
-        >
-          Manage Jobs
-        </Link>
-        <Link
-          href="/receipts"
-          className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors"
-        >
-          Manage Receipts
-        </Link>
+      {/* Projections */}
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Projected Payments</h2>
+      <div className="grid grid-cols-4 gap-4 mb-8">
+        <StatCard label="Next Week" value={dollars(nextWeekTotal)} sub={`${nextWeekProjections.length} projections`} color="yellow" />
+        <StatCard label="Future" value={dollars(futureTotal)} sub={`${futureProjections.length} projections`} color="gray" />
+        <StatCard label="Projected" value={projectedCount.toString()} sub="awaiting payment" color="blue" />
+        <StatCard label="Partial" value={partialCount.toString()} sub="partially received" color="orange" />
+      </div>
+
+      {/* Quick links */}
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Quick Actions</h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <QuickLink href="/jobs" label="Cash Receipts" desc={`${jobs} jobs tracked`} />
+        <QuickLink href="/projections" label="Projections" desc={`${projections.length} active`} />
+        <QuickLink href="/projections/new" label="Add Projection" desc="Log a new expected payment" />
+        <QuickLink href="/report" label="Friday Report" desc="Build & copy email" />
       </div>
     </div>
   )
 }
 
-function StatCard({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <div className="text-xs text-gray-500 uppercase tracking-wide">{label}</div>
-      <div className={`text-2xl font-bold mt-1 ${mono ? 'font-mono' : ''}`}>{value}</div>
-    </div>
-  )
-}
-
-function StatusCard({
-  label,
-  count,
-  sub,
-  color,
-}: {
-  label: string
-  count: number
-  sub: string
-  color: 'green' | 'yellow' | 'red'
-}) {
-  const styles = {
-    green: 'bg-green-50 border-green-200 text-green-800',
-    yellow: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    red: 'bg-red-50 border-red-200 text-red-800',
+function StatCard({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
+  const colors: Record<string, string> = {
+    blue: 'border-blue-200 bg-blue-50',
+    green: 'border-green-200 bg-green-50',
+    yellow: 'border-yellow-200 bg-yellow-50',
+    orange: 'border-orange-200 bg-orange-50',
+    gray: 'border-gray-200 bg-white',
   }
   return (
-    <div className={`rounded-xl border p-5 ${styles[color]}`}>
-      <div className="text-sm font-medium">{label}</div>
-      <div className="text-4xl font-bold my-2">{count}</div>
-      <div className="text-xs opacity-70">{sub}</div>
+    <div className={`rounded-xl border p-4 ${colors[color] ?? colors.gray}`}>
+      <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">{label}</div>
+      <div className="text-2xl font-bold font-mono mt-1 text-gray-900">{value}</div>
+      <div className="text-xs text-gray-400 mt-1">{sub}</div>
     </div>
+  )
+}
+
+function QuickLink({ href, label, desc }: { href: string; label: string; desc: string }) {
+  return (
+    <Link href={href} className="bg-white border border-gray-200 rounded-xl p-4 hover:border-slate-400 hover:shadow-sm transition-all">
+      <div className="font-semibold text-sm text-gray-900">{label}</div>
+      <div className="text-xs text-gray-400 mt-1">{desc}</div>
+    </Link>
   )
 }
