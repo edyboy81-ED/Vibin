@@ -253,7 +253,7 @@ export default function JobDetailPage() {
               <Th>Date Received</Th>
               <Th right>Amount</Th>
               <Th>Paid Thru</Th>
-              <Th right>Days Since Prev</Th>
+              <Th right>Days Since Last</Th>
               <Th>Notes</Th>
             </tr>
           </thead>
@@ -267,11 +267,11 @@ export default function JobDetailPage() {
                 : daysSince(p.datePmtReceived)
               return (
                 <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="py-3 pr-4">{fmtDate(p.datePmtReceived)}</td>
-                  <td className="py-3 pr-4 text-right font-mono">{dollars(p.amountReceived)}</td>
-                  <td className="py-3 pr-4 text-gray-500">{fmtDate(p.paidThruDate)}</td>
-                  <td className="py-3 pr-4 text-right text-gray-500">{daysBetween ?? '—'}</td>
-                  <td className="py-3 text-gray-500 text-xs">{p.notes ?? '—'}</td>
+                  <td className="py-3 px-3">{fmtDate(p.datePmtReceived)}</td>
+                  <td className="py-3 px-3 text-right font-mono">{dollars(p.amountReceived)}</td>
+                  <td className="py-3 px-3 text-gray-500">{fmtDate(p.paidThruDate)}</td>
+                  <td className="py-3 px-3 text-right text-gray-500">{daysBetween ?? '—'}</td>
+                  <td className="py-3 px-3 text-gray-500 text-xs">{p.notes ?? '—'}</td>
                 </tr>
               )
             })}
@@ -331,5 +331,5 @@ function Pair({ label, value, mono }: { label: string; value: string; mono?: boo
 }
 
 function Th({ children, right }: { children?: React.ReactNode; right?: boolean }) {
-  return <th className={`pb-2 text-xs font-semibold text-gray-400 uppercase tracking-wide ${right ? 'text-right' : 'text-left'}`}>{children}</th>
+  return <th className={`pb-2 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wide ${right ? 'text-right' : 'text-left'}`}>{children}</th>
 }
