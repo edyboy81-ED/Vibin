@@ -157,36 +157,36 @@ export default function ProjectionsPage() {
 
 function ProjectionTable({ rows }: { rows: Projection[] }) {
   return (
-    <table className="w-full text-sm">
+    <table className="w-full table-fixed text-sm">
       <thead>
         <tr className="border-b border-gray-100">
-          <Th>Job #</Th>
-          <Th>Job Name</Th>
-          <Th>Est #</Th>
-          <Th>Billing Period</Th>
-          <Th right>Amount</Th>
-          <Th>Status</Th>
-          <Th>Latest Note</Th>
-          <Th></Th>
+          <Th w="w-[9%]">Job #</Th>
+          <Th w="w-[20%]">Job Name</Th>
+          <Th w="w-[8%]">Est #</Th>
+          <Th w="w-[14%]">Billing Period</Th>
+          <Th w="w-[12%]">Amount</Th>
+          <Th w="w-[10%]">Status</Th>
+          <Th w="w-[23%]">Latest Note</Th>
+          <Th w="w-[4%]"></Th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50">
         {rows.map(p => (
           <tr key={p.id} className="hover:bg-slate-50">
             <td className="px-4 py-3 font-mono text-xs">{p.jobNumber}</td>
-            <td className="px-4 py-3 text-gray-800 max-w-48 truncate">{p.jobName}</td>
+            <td className="px-4 py-3 text-gray-800 truncate">{p.jobName}</td>
             <td className="px-4 py-3 text-gray-500">{p.estimateNumber}</td>
-            <td className="px-4 py-3 text-gray-400 text-xs">{p.billingPeriod}</td>
-            <td className="px-4 py-3 text-right font-mono">{dollars(p.estimatedAmountOwed)}</td>
+            <td className="px-4 py-3 text-gray-400 text-xs truncate">{p.billingPeriod}</td>
+            <td className="px-4 py-3 font-mono">{dollars(p.estimatedAmountOwed)}</td>
             <td className="px-4 py-3">
               <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: p.status.color + '22', color: p.status.color }}>
                 {p.status.name}
               </span>
             </td>
-            <td className="px-4 py-3 text-gray-400 text-xs max-w-64 truncate">
+            <td className="px-4 py-3 text-gray-400 text-xs truncate">
               {p.notes[0]?.content ?? '—'}
             </td>
-            <td className="px-4 py-3 text-right">
+            <td className="px-4 py-3">
               <Link href={`/projections/${p.id}`} className="text-xs text-blue-600 hover:underline whitespace-nowrap">View →</Link>
             </td>
           </tr>
@@ -196,9 +196,9 @@ function ProjectionTable({ rows }: { rows: Projection[] }) {
   )
 }
 
-function Th({ children, right }: { children?: React.ReactNode; right?: boolean }) {
+function Th({ children, w }: { children?: React.ReactNode; w?: string }) {
   return (
-    <th className={`px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide ${right ? 'text-right' : 'text-left'}`}>
+    <th className={`px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide text-left ${w ?? ''}`}>
       {children}
     </th>
   )

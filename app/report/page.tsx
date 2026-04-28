@@ -206,28 +206,28 @@ function PaymentDateGroup({ section }: { section: ReportSection }) {
 
 function ProjectionMiniTable({ rows }: { rows: ReportSection['legacyRows'] }) {
   return (
-    <table className="w-full text-xs border border-t-0 border-gray-200 rounded-b-lg overflow-hidden">
+    <table className="w-full table-fixed text-xs border border-t-0 border-gray-200 rounded-b-lg overflow-hidden">
       <thead className="bg-gray-50 border-b border-gray-200">
         <tr>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500">Job #</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500">Job Name</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500">Est #</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500">Billing Period</th>
-          <th className="px-3 py-1.5 text-right font-medium text-gray-500">Amount</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500">Status</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500">Notes</th>
+          <th className="px-3 py-1.5 text-left font-medium text-gray-500 w-[9%]">Job #</th>
+          <th className="px-3 py-1.5 text-left font-medium text-gray-500 w-[18%]">Job Name</th>
+          <th className="px-3 py-1.5 text-left font-medium text-gray-500 w-[8%]">Est #</th>
+          <th className="px-3 py-1.5 text-left font-medium text-gray-500 w-[14%]">Billing Period</th>
+          <th className="px-3 py-1.5 text-left font-medium text-gray-500 w-[12%]">Amount</th>
+          <th className="px-3 py-1.5 text-left font-medium text-gray-500 w-[10%]">Status</th>
+          <th className="px-3 py-1.5 text-left font-medium text-gray-500 w-[29%]">Notes</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50">
         {rows.map((r, i) => (
           <tr key={i} className="hover:bg-gray-50">
             <td className="px-3 py-2 font-mono">{r.jobNumber}</td>
-            <td className="px-3 py-2 text-gray-700 max-w-40 truncate">{r.jobName}</td>
+            <td className="px-3 py-2 text-gray-700 truncate">{r.jobName}</td>
             <td className="px-3 py-2 text-gray-500">{r.estimateNumber}</td>
-            <td className="px-3 py-2 text-gray-400">{r.billingPeriod}</td>
-            <td className="px-3 py-2 text-right font-mono">{dollars(r.estimatedAmountOwed)}</td>
+            <td className="px-3 py-2 text-gray-400 truncate">{r.billingPeriod}</td>
+            <td className="px-3 py-2 font-mono">{dollars(r.estimatedAmountOwed)}</td>
             <td className="px-3 py-2 text-gray-500">{r.statusName}</td>
-            <td className="px-3 py-2 text-gray-400 max-w-48 truncate">{r.notes || '—'}</td>
+            <td className="px-3 py-2 text-gray-400 truncate">{r.notes || '—'}</td>
           </tr>
         ))}
       </tbody>
@@ -237,24 +237,24 @@ function ProjectionMiniTable({ rows }: { rows: ReportSection['legacyRows'] }) {
 
 function LastWeekTable({ rows }: { rows: LastWeekStatusRow[] }) {
   return (
-    <table className="w-full text-xs">
+    <table className="w-full table-fixed text-xs">
       <thead>
         <tr className="border-b border-gray-100">
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job #</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Est #</th>
-          <th className="pb-2 text-right font-medium text-gray-400 uppercase tracking-wide">Amount</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Division</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Status</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[12%]">Job #</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[28%]">Job Name</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[10%]">Est #</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[15%]">Amount</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[10%]">Division</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[25%]">Status</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50">
         {rows.map((r, i) => (
           <tr key={i}>
             <td className="py-2 px-3 font-mono">{r.jobNumber}</td>
-            <td className="py-2 px-3 text-gray-700">{r.jobName}</td>
+            <td className="py-2 px-3 text-gray-700 truncate">{r.jobName}</td>
             <td className="py-2 px-3 text-gray-500">{r.estimateNumber}</td>
-            <td className="py-2 px-3 text-right font-mono">{dollars(r.estimatedAmountOwed)}</td>
+            <td className="py-2 px-3 font-mono">{dollars(r.estimatedAmountOwed)}</td>
             <td className="py-2 px-3 text-gray-500">{r.division}</td>
             <td className="py-2 px-3">
               <span className="px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: r.statusColor + '22', color: r.statusColor }}>
@@ -270,24 +270,24 @@ function LastWeekTable({ rows }: { rows: LastWeekStatusRow[] }) {
 
 function UnplannedTable({ rows }: { rows: UnplannedReceiptRow[] }) {
   return (
-    <table className="w-full text-xs">
+    <table className="w-full table-fixed text-xs">
       <thead>
         <tr className="border-b border-gray-100">
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job #</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Division</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Date</th>
-          <th className="pb-2 text-right font-medium text-gray-400 uppercase tracking-wide">Amount</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[12%]">Job #</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[35%]">Job Name</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[10%]">Division</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[13%]">Date</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[15%]">Amount</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50">
         {rows.map((r, i) => (
           <tr key={i}>
             <td className="py-2 px-3 font-mono">{r.jobNumber}</td>
-            <td className="py-2 px-3 text-gray-700">{r.jobName}</td>
+            <td className="py-2 px-3 text-gray-700 truncate">{r.jobName}</td>
             <td className="py-2 px-3 text-gray-500">{r.division}</td>
             <td className="py-2 px-3 text-gray-500">{r.datePmtReceived}</td>
-            <td className="py-2 px-3 text-right font-mono">{dollars(r.amountReceived)}</td>
+            <td className="py-2 px-3 font-mono">{dollars(r.amountReceived)}</td>
           </tr>
         ))}
       </tbody>

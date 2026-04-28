@@ -247,14 +247,14 @@ export default function JobDetailPage() {
           </form>
         )}
 
-        <table className="w-full text-sm">
+        <table className="w-full table-fixed text-sm">
           <thead>
             <tr className="border-b border-gray-100">
-              <Th>Date Received</Th>
-              <Th right>Amount</Th>
-              <Th>Paid Thru</Th>
-              <Th right>Days Since Last</Th>
-              <Th>Notes</Th>
+              <Th w="w-[18%]">Date Received</Th>
+              <Th w="w-[18%]">Amount</Th>
+              <Th w="w-[18%]">Paid Thru</Th>
+              <Th w="w-[18%]">Days Since Last</Th>
+              <Th w="w-[28%]">Notes</Th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -268,10 +268,10 @@ export default function JobDetailPage() {
               return (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="py-3 px-3">{fmtDate(p.datePmtReceived)}</td>
-                  <td className="py-3 px-3 text-right font-mono">{dollars(p.amountReceived)}</td>
+                  <td className="py-3 px-3 font-mono">{dollars(p.amountReceived)}</td>
                   <td className="py-3 px-3 text-gray-500">{fmtDate(p.paidThruDate)}</td>
-                  <td className="py-3 px-3 text-right text-gray-500">{daysBetween ?? '—'}</td>
-                  <td className="py-3 px-3 text-gray-500 text-xs">{p.notes ?? '—'}</td>
+                  <td className="py-3 px-3 text-gray-500">{daysBetween ?? '—'}</td>
+                  <td className="py-3 px-3 text-gray-500 text-xs truncate">{p.notes ?? '—'}</td>
                 </tr>
               )
             })}
@@ -283,21 +283,21 @@ export default function JobDetailPage() {
       {job.projections.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="font-semibold text-gray-900 mb-4">Active Projections</h2>
-          <table className="w-full text-sm">
+          <table className="w-full table-fixed text-sm">
             <thead>
               <tr className="border-b border-gray-100">
-                <Th>Est #</Th>
-                <Th right>Amount</Th>
-                <Th>Est. Payment Date</Th>
-                <Th>Status</Th>
-                <Th></Th>
+                <Th w="w-[15%]">Est #</Th>
+                <Th w="w-[20%]">Amount</Th>
+                <Th w="w-[25%]">Est. Payment Date</Th>
+                <Th w="w-[25%]">Status</Th>
+                <Th w="w-[15%]"></Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {job.projections.map(p => (
                 <tr key={p.id}>
                   <td className="py-3 px-3 font-mono text-xs">{p.estimateNumber}</td>
-                  <td className="py-3 px-3 text-right font-mono">{dollars(p.estimatedAmountOwed)}</td>
+                  <td className="py-3 px-3 font-mono">{dollars(p.estimatedAmountOwed)}</td>
                   <td className="py-3 px-3">{fmtDate(p.estimatedPaymentDate)}</td>
                   <td className="py-3 px-3">
                     <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: p.status.color + '22', color: p.status.color }}>
@@ -330,6 +330,6 @@ function Pair({ label, value, mono }: { label: string; value: string; mono?: boo
   )
 }
 
-function Th({ children, right }: { children?: React.ReactNode; right?: boolean }) {
-  return <th className={`pb-2 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wide ${right ? 'text-right' : 'text-left'}`}>{children}</th>
+function Th({ children, w }: { children?: React.ReactNode; w?: string }) {
+  return <th className={`pb-2 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wide text-left ${w ?? ''}`}>{children}</th>
 }

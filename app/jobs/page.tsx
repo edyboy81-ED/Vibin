@@ -162,18 +162,18 @@ export default function JobsPage() {
           {filtered.length} of {jobs.length} jobs
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full table-fixed text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <Th>Job #</Th>
-                <Th>Job Name</Th>
-                <Th>Company</Th>
-                <Th>Status</Th>
-                <Th right>Last Payment</Th>
-                <Th right>Days Since</Th>
-                <Th right>Amount Received</Th>
-                <Th right>Next Due</Th>
-                <Th></Th>
+                <Th w="w-[8%]">Job #</Th>
+                <Th w="w-[18%]">Job Name</Th>
+                <Th w="w-[16%]">Company</Th>
+                <Th w="w-[10%]">Status</Th>
+                <Th w="w-[12%]">Last Payment</Th>
+                <Th w="w-[10%]">Days Since</Th>
+                <Th w="w-[13%]">Amount Received</Th>
+                <Th w="w-[10%]">Next Due</Th>
+                <Th w="w-[3%]"></Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -187,20 +187,20 @@ export default function JobsPage() {
                 return (
                   <tr key={job.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => window.location.href = `/jobs/${job.id}`}>
                     <td className="px-4 py-3 font-mono text-xs font-medium">{job.jobNumber}</td>
-                    <td className="px-4 py-3 text-gray-800">{job.jobName}</td>
+                    <td className="px-4 py-3 text-gray-800 truncate">{job.jobName}</td>
                     <td className="px-4 py-3">
-                      <div className="text-xs text-gray-600">{job.company}</div>
+                      <div className="text-xs text-gray-600 truncate">{job.company}</div>
                       <div className="text-xs text-gray-400">{job.division}</div>
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={job.jobStatus} />
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-500 text-xs">{latest ? fmtDate(latest.datePmtReceived) : '—'}</td>
-                    <td className={`px-4 py-3 text-right text-xs font-mono ${days != null && days > 90 ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{latest ? fmtDate(latest.datePmtReceived) : '—'}</td>
+                    <td className={`px-4 py-3 text-xs font-mono ${days != null && days > 90 ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
                       {days != null ? days : '—'}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-sm">{latest ? dollars(latest.amountReceived) : '—'}</td>
-                    <td className="px-4 py-3 text-right font-mono text-sm text-gray-500">{job.nextAmountDue ? dollars(job.nextAmountDue) : '—'}</td>
+                    <td className="px-4 py-3 font-mono text-sm">{latest ? dollars(latest.amountReceived) : '—'}</td>
+                    <td className="px-4 py-3 font-mono text-sm text-gray-500">{job.nextAmountDue ? dollars(job.nextAmountDue) : '—'}</td>
                     <td className="px-4 py-3 text-right">
                       {job._count.projections > 0 && (
                         <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{job._count.projections} proj</span>
@@ -232,9 +232,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function Th({ children, right }: { children?: React.ReactNode; right?: boolean }) {
+function Th({ children, w }: { children?: React.ReactNode; w?: string }) {
   return (
-    <th className={`px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap ${right ? 'text-right' : 'text-left'}`}>
+    <th className={`px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left ${w ?? ''}`}>
       {children}
     </th>
   )
