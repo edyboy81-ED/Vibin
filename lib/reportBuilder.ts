@@ -193,102 +193,135 @@ export function generateEmailBody(data: ReportData): string {
   const lines: string[] = []
   const div = '─'.repeat(60)
 
-  // Opening
-  lines.push('Hello Leadership Team,', '')
-  lines.push(
-    `Please see below for this week's cash receipts and projected payments for next week.`,
-    ''
-  )
+  const allNextWeekRows = data.nextWeekSections.flatMap(s => [
+    ...s.legacyRows.map(r => ({ ...r, division: 'Legacy', weekDate: s.date })),
+    ...s.abRows.map(r => ({ ...r, division: 'AB', weekDate: s.date })),
+  ])
+  const allFutureRows = data.futureSections.flatMap(s => [
+    ...s.legacyRows.map(r => ({ ...r, division: 'Legacy', weekDate: s.date })),
+    ...s.abRows.map(r => ({ ...r, division: 'AB', weekDate: s.date })),
+  ])
+  const nextWeekGrandTotal = data.nextWeekSections.reduce((s, sec) => s + sec.legacyTotal + sec.abTotal, 0)
+  const futureGrandTotal   = data.futureSections.reduce((s, sec) => s + sec.legacyTotal + sec.abTotal, 0)
 
-  // Cash receipts summary
+  // ── Opening ──────────────────────────────────────────────
+  lines.push('Hello Leadership Team,', '')
+  lines.push('Attached are this week\'s cash receipts and projected payment updates.', '')
+
+  // ── Weekly Cash Receipts ─────────────────────────────────
   lines.push(div)
-  lines.push('CASH RECEIPTS THIS WEEK')
+  lines.push('WEEKLY CASH RECEIPTS')
   lines.push(div)
   lines.push(`  Legacy:    ${dollars(data.legacyReceiptsTotal)}`)
   lines.push(`  AB:        ${dollars(data.abReceiptsTotal)}`)
   lines.push(`  Combined:  ${dollars(data.combinedReceiptsTotal)}`)
   lines.push('')
 
-  // Helper: render one division's projection rows
-  const renderDivisionRows = (label: string, rows: ProjectionRow[], total: number) => {
-    lines.push(`${label}  –  ${dollars(total)}`)
-    if (rows.length === 0) {
-      lines.push('  (none)')
-    } else {
-      for (const r of rows) {
-        lines.push(`  • ${r.jobNumber}  |  ${r.jobName}  |  Est #${r.estimateNumber}  |  ${r.billingPeriod}  |  ${dollars(r.estimatedAmountOwed)}`)
-        if (r.notes) lines.push(`    Note: ${r.notes}`)
+  // ── Projected Payments Summary (table by week) ───────────
+  lines.push(div)
+  lines.push('PROJECTED PAYMENTS SUMMARY')
+  lines.push(div)
+
+  const allSections = [
+    ...data.nextWeekSections.map(s => ({ ...s, label: 'Next Week' })),
+    ...data.futureSections.map(s => ({ ...s, label: 'Future' })),
+  ]
+
+  if (allSections.length === 0) {
+    lines.push('  No active projections.')
+  } else {
+    const col = (s: string, w: number) => s.padEnd(w)
+    lines.push(
+      '  ' + col('Week Ending', 14) + col('Legacy', 20) + col('AB', 20) + 'Combined'
+    )
+    lines.push('  ' + '─'.repeat(72))
+    for (const sec of allSections) {
+      const combined = sec.legacyTotal + sec.abTotal
+      lines.push(
+        '  ' +
+        col(sec.date, 14) +
+        col(dollars(sec.legacyTotal), 20) +
+        col(dollars(sec.abTotal), 20) +
+        dollars(combined)
+      )
+    }
+    lines.push('  ' + '─'.repeat(72))
+    lines.push(
+      '  ' +
+      col('Total', 14) +
+      col(dollars(data.nextWeekSections.reduce((s, sec) => s + sec.legacyTotal, 0) + data.futureSections.reduce((s, sec) => s + sec.legacyTotal, 0)), 20) +
+      col(dollars(data.nextWeekSections.reduce((s, sec) => s + sec.abTotal, 0) + data.futureSections.reduce((s, sec) => s + sec.abTotal, 0)), 20) +
+      dollars(nextWeekGrandTotal + futureGrandTotal)
+    )
+  }
+  lines.push('')
+
+  // ── Key Notes ────────────────────────────────────────────
+  const notedRows = [...allNextWeekRows, ...allFutureRows].filter(r => r.notes?.trim())
+  if (notedRows.length > 0) {
+    lines.push(div)
+    lines.push('KEY NOTES')
+    lines.push(div)
+
+    if (allNextWeekRows.some(r => r.notes?.trim())) {
+      lines.push('Next Week:')
+      for (const r of allNextWeekRows.filter(r => r.notes?.trim())) {
+        lines.push(`  • ${r.jobNumber} – ${r.jobName} (${r.division}, ${dollars(r.estimatedAmountOwed)})`)
+        lines.push(`    ${r.notes}`)
       }
+      lines.push('')
     }
-    lines.push('')
-  }
-
-  // Next week projections
-  if (data.nextWeekSections.length > 0) {
-    lines.push(div)
-    lines.push("NEXT WEEK'S PROJECTED PAYMENTS")
-    lines.push(div)
-    for (const sec of data.nextWeekSections) {
-      lines.push(`Week of ${sec.date}`, '')
-      renderDivisionRows('Legacy', sec.legacyRows, sec.legacyTotal)
-      renderDivisionRows('AB', sec.abRows, sec.abTotal)
-      lines.push(`  Combined for week of ${sec.date}:  ${dollars(sec.legacyTotal + sec.abTotal)}`)
+    if (allFutureRows.some(r => r.notes?.trim())) {
+      lines.push('Future:')
+      for (const r of allFutureRows.filter(r => r.notes?.trim())) {
+        lines.push(`  • ${r.jobNumber} – ${r.jobName} (${r.division}, ${r.weekDate}, ${dollars(r.estimatedAmountOwed)})`)
+        lines.push(`    ${r.notes}`)
+      }
       lines.push('')
     }
   }
 
-  // Future projections
-  if (data.futureSections.length > 0) {
-    const futureTotal = data.futureSections.reduce((s, sec) => s + sec.legacyTotal + sec.abTotal, 0)
-    lines.push(div)
-    lines.push(`FUTURE PROJECTED PAYMENTS  –  ${dollars(futureTotal)} total`)
-    lines.push(div)
-    for (const sec of data.futureSections) {
-      lines.push(`Week of ${sec.date}`, '')
-      renderDivisionRows('Legacy', sec.legacyRows, sec.legacyTotal)
-      renderDivisionRows('AB', sec.abRows, sec.abTotal)
-      lines.push(`  Combined for week of ${sec.date}:  ${dollars(sec.legacyTotal + sec.abTotal)}`)
-      lines.push('')
-    }
-  }
-
-  // Last week status
+  // ── Last Week Status ─────────────────────────────────────
   if (data.lastWeekStatus.length > 0) {
     lines.push(div)
     lines.push("STATUS OF LAST WEEK'S PROJECTIONS")
     lines.push(div)
-    const legacy = data.lastWeekStatus.filter(r => r.division === 'LEGACY')
-    const ab = data.lastWeekStatus.filter(r => r.division === 'AB')
-    if (legacy.length > 0) {
-      lines.push('Legacy', '')
-      for (const r of legacy) {
-        lines.push(`  • ${r.jobNumber}  |  ${r.jobName}  |  Est #${r.estimateNumber}  |  ${dollars(r.estimatedAmountOwed)}  →  ${r.statusName}`)
-        if (r.notes) lines.push(`    Note: ${r.notes}`)
-      }
-      lines.push('')
-    }
-    if (ab.length > 0) {
-      lines.push('AB', '')
-      for (const r of ab) {
-        lines.push(`  • ${r.jobNumber}  |  ${r.jobName}  |  Est #${r.estimateNumber}  |  ${dollars(r.estimatedAmountOwed)}  →  ${r.statusName}`)
-        if (r.notes) lines.push(`    Note: ${r.notes}`)
+    for (const division of ['Legacy', 'AB']) {
+      const rows = data.lastWeekStatus.filter(r => r.division === (division === 'Legacy' ? 'LEGACY' : 'AB'))
+      if (rows.length === 0) continue
+      lines.push(`${division}:`)
+      for (const r of rows) {
+        lines.push(`  • ${r.jobNumber} – ${r.jobName}  |  Est #${r.estimateNumber}  |  ${dollars(r.estimatedAmountOwed)}  →  ${r.statusName}`)
+        if (r.notes) lines.push(`    ${r.notes}`)
       }
       lines.push('')
     }
   }
 
-  // Unplanned receipts
+  // ── Received But Not Projected ───────────────────────────
   if (data.unplannedReceipts.length > 0) {
     lines.push(div)
     lines.push('RECEIVED BUT NOT PROJECTED')
     lines.push(div)
+    const col = (s: string, w: number) => s.padEnd(w)
+    lines.push('  ' + col('Job #', 10) + col('Job Name', 32) + col('Date Received', 16) + 'Amount')
+    lines.push('  ' + '─'.repeat(68))
     for (const r of data.unplannedReceipts) {
-      lines.push(`  • ${r.jobNumber}  |  ${r.jobName}  |  ${r.datePmtReceived}  |  ${dollars(r.amountReceived)}`)
+      lines.push(
+        '  ' +
+        col(r.jobNumber, 10) +
+        col(r.jobName.slice(0, 30), 32) +
+        col(r.datePmtReceived, 16) +
+        dollars(r.amountReceived)
+      )
     }
     lines.push('')
   }
 
-  lines.push('Thank you,')
+  // ── Closing ───────────────────────────────────────────────
+  lines.push('Please let me know if you have any questions.', '')
+  lines.push('Thank you.')
 
   return lines.join('\n')
 }
+
