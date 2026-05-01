@@ -212,37 +212,37 @@ export default function ProjectionsPage() {
 
 function ProjectionTable({ rows }: { rows: Projection[] }) {
   return (
-    <table className="w-full table-fixed text-sm">
+    <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-gray-100">
-          <Th w="w-[9%]">Job #</Th>
-          <Th w="w-[20%]">Job Name</Th>
-          <Th w="w-[8%]">Est #</Th>
-          <Th w="w-[14%]">Billing Period</Th>
-          <Th w="w-[12%]">Amount</Th>
-          <Th w="w-[10%]">Status</Th>
-          <Th w="w-[23%]">Latest Note</Th>
-          <Th w="w-[4%]"></Th>
+          <Th>Job #</Th>
+          <Th>Job Name</Th>
+          <Th>Est #</Th>
+          <Th>Billing Period</Th>
+          <Th>Amount</Th>
+          <Th>Status</Th>
+          <Th>Latest Note</Th>
+          <Th></Th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50">
         {rows.map(p => (
           <tr key={p.id} className="hover:bg-slate-50">
-            <td className="px-4 py-3 font-mono text-xs">{p.jobNumber}</td>
-            <td className="px-4 py-3 text-gray-800 truncate">{p.jobName}</td>
-            <td className="px-4 py-3 text-gray-500">{p.estimateNumber}</td>
-            <td className="px-4 py-3 text-gray-400 text-xs truncate">{p.billingPeriod}</td>
-            <td className="px-4 py-3 font-mono">{dollars(p.estimatedAmountOwed)}</td>
+            <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">{p.jobNumber}</td>
+            <td className="px-4 py-3 text-gray-800">{p.jobName}</td>
+            <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{p.estimateNumber}</td>
+            <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{p.billingPeriod}</td>
+            <td className="px-4 py-3 font-mono whitespace-nowrap">{dollars(p.estimatedAmountOwed)}</td>
             <td className="px-4 py-3">
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: p.status.color + '22', color: p.status.color }}>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap" style={{ backgroundColor: p.status.color + '22', color: p.status.color }}>
                 {p.status.name}
               </span>
             </td>
-            <td className="px-4 py-3 text-gray-400 text-xs truncate">
+            <td className="px-4 py-3 text-gray-400 text-xs">
               {p.notes[0]?.content ?? '—'}
             </td>
-            <td className="px-4 py-3">
-              <Link href={`/projections/${p.id}`} className="text-xs text-blue-600 hover:underline whitespace-nowrap">View →</Link>
+            <td className="px-4 py-3 whitespace-nowrap">
+              <Link href={`/projections/${p.id}`} className="text-xs text-blue-600 hover:underline">View →</Link>
             </td>
           </tr>
         ))}
@@ -251,9 +251,9 @@ function ProjectionTable({ rows }: { rows: Projection[] }) {
   )
 }
 
-function Th({ children, w }: { children?: React.ReactNode; w?: string }) {
+function Th({ children }: { children?: React.ReactNode }) {
   return (
-    <th className={`px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide text-left ${w ?? ''}`}>
+    <th className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide text-left">
       {children}
     </th>
   )

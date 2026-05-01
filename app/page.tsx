@@ -4,30 +4,39 @@ import Link from 'next/link'
 
 export default async function DashboardPage() {
   const today = new Date()
-  // Next report Friday: always the upcoming Friday (not today if today is Friday)
+
+  // Next report Friday: always the upcoming Friday (7 days out when today IS Friday)
   const dayOfWeekForFriday = today.getUTCDay()
   const daysUntilFriday = dayOfWeekForFriday === 5 ? 7 : (5 - dayOfWeekForFriday + 7) % 7
   const friday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + daysUntilFriday))
 
+  // This week: Monday 00:00 UTC → today 23:59 UTC
   const startOfWeek = new Date(Date.UTC(
     today.getUTCFullYear(),
     today.getUTCMonth(),
     today.getUTCDate() - (today.getUTCDay() === 0 ? 6 : today.getUTCDay() - 1)
   ))
-  const endOfDay = new Date(today)
-  endOfDay.setUTCHours(23, 59, 59, 999)
+  const endOfToday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999))
+
+  // Next calendar week: Mon–Fri in UTC
+  const dayOfWeek = today.getUTCDay()
+  const daysUntilNextMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek
+  const nextWeekMon = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + daysUntilNextMonday))
+  const nextWeekFri = new Date(Date.UTC(nextWeekMon.getUTCFullYear(), nextWeekMon.getUTCMonth(), nextWeekMon.getUTCDate() + 4))
+  const nextWeekFriEnd = new Date(Date.UTC(nextWeekFri.getUTCFullYear(), nextWeekFri.getUTCMonth(), nextWeekFri.getUTCDate(), 23, 59, 59, 999))
 
   const dateFrom = startOfWeek.toISOString().slice(0, 10)
   const dateTo = today.toISOString().slice(0, 10)
+  const nextWeekMonStr = nextWeekMon.toISOString().slice(0, 10)
+  const nextWeekFriStr = nextWeekFri.toISOString().slice(0, 10)
+  const afterNextWeekFriStr = new Date(nextWeekFri.getTime() + 86_400_000).toISOString().slice(0, 10)
 
-  const weekWindow = { gte: startOfWeek, lte: endOfDay }
+  const weekWindow = { gte: startOfWeek, lte: endOfToday }
 
-  const [jobs, weekJobs, projections] = await Promise.all([
+  const [jobs, weekJobs, allActive, nextWeekProjections, futureProjections] = await Promise.all([
     prisma.job.count(),
     prisma.job.findMany({
-      where: {
-        payments: { some: { datePmtReceived: weekWindow } },
-      },
+      where: { payments: { some: { datePmtReceived: weekWindow } } },
       include: {
         payments: {
           where: { datePmtReceived: weekWindow },
@@ -38,7 +47,15 @@ export default async function DashboardPage() {
     }),
     prisma.projectedPayment.findMany({
       where: { isActive: true },
-      include: { status: true },
+      select: { status: { select: { name: true } } },
+    }),
+    prisma.projectedPayment.findMany({
+      where: { isActive: true, estimatedPaymentDate: { gte: nextWeekMon, lte: nextWeekFriEnd } },
+      select: { estimatedAmountOwed: true },
+    }),
+    prisma.projectedPayment.findMany({
+      where: { isActive: true, estimatedPaymentDate: { gt: nextWeekFriEnd } },
+      select: { estimatedAmountOwed: true },
     }),
   ])
 
@@ -47,26 +64,11 @@ export default async function DashboardPage() {
   const weekLegacy = weekLegacyJobs.reduce((s, j) => s + (j.payments[0]?.amountReceived ?? 0), 0)
   const weekAB = weekABJobs.reduce((s, j) => s + (j.payments[0]?.amountReceived ?? 0), 0)
 
-  // Next calendar week: Mon–Fri, always the upcoming week regardless of today's day (UTC)
-  const dayOfWeek = today.getUTCDay() // 0=Sun, 1=Mon, ..., 6=Sat
-  const daysUntilNextMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek
-  const nextWeekMon = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + daysUntilNextMonday))
-  const nextWeekFri = new Date(Date.UTC(nextWeekMon.getUTCFullYear(), nextWeekMon.getUTCMonth(), nextWeekMon.getUTCDate() + 4))
-  const nextWeekMonStr = nextWeekMon.toISOString().slice(0, 10)
-  const nextWeekFriStr = nextWeekFri.toISOString().slice(0, 10)
-  const afterNextWeekFriStr = new Date(nextWeekFri.getTime() + 86_400_000).toISOString().slice(0, 10)
-
-  const nextWeekProjections = projections.filter(p => {
-    const d = new Date(p.estimatedPaymentDate)
-    return d >= nextWeekMon && d <= nextWeekFri
-  })
-  const futureProjections = projections.filter(p => new Date(p.estimatedPaymentDate) > nextWeekFri)
-
   const nextWeekTotal = nextWeekProjections.reduce((s, p) => s + p.estimatedAmountOwed, 0)
   const futureTotal = futureProjections.reduce((s, p) => s + p.estimatedAmountOwed, 0)
 
-  const projectedCount = projections.filter(p => p.status.name === 'Projected').length
-  const partialCount = projections.filter(p => p.status.name === 'Partial').length
+  const projectedCount = allActive.filter(p => p.status.name === 'Projected').length
+  const partialCount = allActive.filter(p => p.status.name === 'Partial').length
 
   return (
     <div>
@@ -104,7 +106,7 @@ export default async function DashboardPage() {
       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Quick Actions</h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <QuickLink href="/jobs" label="Cash Receipts" desc={`${jobs} jobs tracked`} />
-        <QuickLink href="/projections" label="Projections" desc={`${projections.length} active`} />
+        <QuickLink href="/projections" label="Projections" desc={`${allActive.length} active`} />
         <QuickLink href="/projections/new" label="Add Projection" desc="Log a new expected payment" />
         <QuickLink href="/report" label="Friday Report" desc="Build & copy email" />
       </div>

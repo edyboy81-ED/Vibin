@@ -55,16 +55,17 @@ export default function ReportPage() {
     : 0
 
   return (
-    <div className="max-w-4xl">
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-5xl">
+      {/* Page header — hidden when printing */}
+      <div className="flex items-center justify-between mb-6 print:hidden">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Friday Report</h1>
           <p className="text-sm text-gray-400 mt-1">Generate the weekly leadership email</p>
         </div>
       </div>
 
-      {/* Date selector */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-5 flex items-end gap-4">
+      {/* Date selector — hidden when printing */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-5 flex items-end gap-4 print:hidden">
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Report Date (Friday)</label>
           <input
@@ -94,6 +95,28 @@ export default function ReportPage() {
 
       {data && (
         <>
+          {/* Print header — only visible when printing */}
+          <div className="hidden print:block mb-6">
+            <h1 className="text-xl font-bold text-gray-900">Friday Report — {fmtDate(data.reportDate)}</h1>
+          </div>
+
+          {/* Action bar — hidden when printing */}
+          <div className="flex justify-end gap-2 mb-4 print:hidden">
+            <button
+              onClick={() => window.print()}
+              className="text-sm border border-gray-300 bg-white px-4 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50"
+            >
+              Print Report
+            </button>
+            <button
+              onClick={generateEmail}
+              disabled={generating}
+              className="text-sm bg-slate-900 text-white px-4 py-1.5 rounded-lg hover:bg-slate-700 disabled:opacity-50"
+            >
+              {generating ? 'Generating…' : 'Generate Email'}
+            </button>
+          </div>
+
           {/* Summary totals */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
             <SummaryCard label="Legacy Receipts" value={dollars(data.legacyReceiptsTotal)} color="text-slate-700" />
@@ -134,27 +157,18 @@ export default function ReportPage() {
             </Section>
           )}
 
-          {/* Generate email */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 mt-5">
+          {/* Email body — hidden when printing */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 mt-5 print:hidden">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold text-gray-900">Email Body</h2>
-              <div className="flex gap-2">
+              {emailBody && (
                 <button
-                  onClick={generateEmail}
-                  disabled={generating}
-                  className="text-sm bg-slate-900 text-white px-4 py-1.5 rounded-lg hover:bg-slate-700 disabled:opacity-50"
+                  onClick={copyToClipboard}
+                  className={`text-sm px-4 py-1.5 rounded-lg border transition-colors ${copied ? 'bg-green-50 border-green-300 text-green-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
                 >
-                  {generating ? 'Generating…' : 'Generate Email'}
+                  {copied ? 'Copied!' : 'Copy'}
                 </button>
-                {emailBody && (
-                  <button
-                    onClick={copyToClipboard}
-                    className={`text-sm px-4 py-1.5 rounded-lg border transition-colors ${copied ? 'bg-green-50 border-green-300 text-green-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-                  >
-                    {copied ? 'Copied!' : 'Copy'}
-                  </button>
-                )}
-              </div>
+              )}
             </div>
             {emailBody ? (
               <pre className="text-xs font-mono bg-gray-50 rounded-lg p-4 whitespace-pre-wrap text-gray-700 border border-gray-100 max-h-96 overflow-y-auto">
@@ -181,7 +195,7 @@ function SummaryCard({ label, value, color, bold }: { label: string; value: stri
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+    <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4 break-inside-avoid">
       <h2 className="font-semibold text-gray-900 mb-4">{title}</h2>
       {children}
     </div>
@@ -220,28 +234,28 @@ function PaymentDateGroup({ section }: { section: ReportSection }) {
 
 function ProjectionMiniTable({ rows }: { rows: ReportSection['legacyRows'] }) {
   return (
-    <table className="w-full table-fixed text-xs border border-t-0 border-gray-200 rounded-b-lg overflow-hidden">
+    <table className="w-full text-xs border border-t-0 border-gray-200 rounded-b-lg overflow-hidden">
       <thead className="bg-gray-50 border-b border-gray-200">
         <tr>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500 w-[9%]">Job #</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500 w-[18%]">Job Name</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500 w-[8%]">Est #</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500 w-[14%]">Billing Period</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500 w-[12%]">Amount</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500 w-[10%]">Status</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500 w-[29%]">Notes</th>
+          <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Job #</th>
+          <th className="px-3 py-1.5 text-left font-medium text-gray-500">Job Name</th>
+          <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Est #</th>
+          <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Billing Period</th>
+          <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Amount</th>
+          <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Status</th>
+          <th className="px-3 py-1.5 text-left font-medium text-gray-500">Notes</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50">
         {rows.map((r, i) => (
           <tr key={i} className="hover:bg-gray-50">
-            <td className="px-3 py-2 font-mono">{r.jobNumber}</td>
-            <td className="px-3 py-2 text-gray-700 truncate">{r.jobName}</td>
-            <td className="px-3 py-2 text-gray-500">{r.estimateNumber}</td>
-            <td className="px-3 py-2 text-gray-400 truncate">{r.billingPeriod}</td>
-            <td className="px-3 py-2 font-mono">{dollars(r.estimatedAmountOwed)}</td>
-            <td className="px-3 py-2 text-gray-500">{r.statusName}</td>
-            <td className="px-3 py-2 text-gray-400 truncate">{r.notes || '—'}</td>
+            <td className="px-3 py-2 font-mono whitespace-nowrap">{r.jobNumber}</td>
+            <td className="px-3 py-2 text-gray-700">{r.jobName}</td>
+            <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.estimateNumber}</td>
+            <td className="px-3 py-2 text-gray-400 whitespace-nowrap">{r.billingPeriod}</td>
+            <td className="px-3 py-2 font-mono whitespace-nowrap">{dollars(r.estimatedAmountOwed)}</td>
+            <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.statusName}</td>
+            <td className="px-3 py-2 text-gray-400">{r.notes || '—'}</td>
           </tr>
         ))}
       </tbody>
@@ -251,27 +265,27 @@ function ProjectionMiniTable({ rows }: { rows: ReportSection['legacyRows'] }) {
 
 function LastWeekTable({ rows }: { rows: LastWeekStatusRow[] }) {
   return (
-    <table className="w-full table-fixed text-xs">
+    <table className="w-full text-xs">
       <thead>
         <tr className="border-b border-gray-100">
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[12%]">Job #</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[28%]">Job Name</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[10%]">Est #</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[15%]">Amount</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[10%]">Division</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[25%]">Status</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Job #</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Est #</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Amount</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Division</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Status</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50">
         {rows.map((r, i) => (
           <tr key={i}>
-            <td className="py-2 px-3 font-mono">{r.jobNumber}</td>
-            <td className="py-2 px-3 text-gray-700 truncate">{r.jobName}</td>
-            <td className="py-2 px-3 text-gray-500">{r.estimateNumber}</td>
-            <td className="py-2 px-3 font-mono">{dollars(r.estimatedAmountOwed)}</td>
-            <td className="py-2 px-3 text-gray-500">{r.division}</td>
+            <td className="py-2 px-3 font-mono whitespace-nowrap">{r.jobNumber}</td>
+            <td className="py-2 px-3 text-gray-700">{r.jobName}</td>
+            <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{r.estimateNumber}</td>
+            <td className="py-2 px-3 font-mono whitespace-nowrap">{dollars(r.estimatedAmountOwed)}</td>
+            <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{r.division}</td>
             <td className="py-2 px-3">
-              <span className="px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: r.statusColor + '22', color: r.statusColor }}>
+              <span className="px-2 py-0.5 rounded-full font-medium whitespace-nowrap" style={{ backgroundColor: r.statusColor + '22', color: r.statusColor }}>
                 {r.statusName}
               </span>
             </td>
@@ -284,24 +298,24 @@ function LastWeekTable({ rows }: { rows: LastWeekStatusRow[] }) {
 
 function UnplannedTable({ rows }: { rows: UnplannedReceiptRow[] }) {
   return (
-    <table className="w-full table-fixed text-xs">
+    <table className="w-full text-xs">
       <thead>
         <tr className="border-b border-gray-100">
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[12%]">Job #</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[35%]">Job Name</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[10%]">Division</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[13%]">Date</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide w-[15%]">Amount</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Job #</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Division</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Date</th>
+          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Amount</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-50">
         {rows.map((r, i) => (
           <tr key={i}>
-            <td className="py-2 px-3 font-mono">{r.jobNumber}</td>
-            <td className="py-2 px-3 text-gray-700 truncate">{r.jobName}</td>
-            <td className="py-2 px-3 text-gray-500">{r.division}</td>
-            <td className="py-2 px-3 text-gray-500">{r.datePmtReceived}</td>
-            <td className="py-2 px-3 font-mono">{dollars(r.amountReceived)}</td>
+            <td className="py-2 px-3 font-mono whitespace-nowrap">{r.jobNumber}</td>
+            <td className="py-2 px-3 text-gray-700">{r.jobName}</td>
+            <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{r.division}</td>
+            <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{r.datePmtReceived}</td>
+            <td className="py-2 px-3 font-mono whitespace-nowrap">{dollars(r.amountReceived)}</td>
           </tr>
         ))}
       </tbody>
