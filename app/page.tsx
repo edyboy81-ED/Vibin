@@ -6,23 +6,31 @@ export default async function DashboardPage() {
   const today = new Date()
   const friday = nextFriday(today)
 
-  // Start of current work week (Monday midnight)
-  const daysSinceMonday = today.getDay() === 0 ? 6 : today.getDay() - 1
-  const startOfWeek = new Date(today)
-  startOfWeek.setDate(today.getDate() - daysSinceMonday)
-  startOfWeek.setHours(0, 0, 0, 0)
+  const startOfWeek = new Date(Date.UTC(
+    today.getUTCFullYear(),
+    today.getUTCMonth(),
+    today.getUTCDate() - (today.getUTCDay() === 0 ? 6 : today.getUTCDay() - 1)
+  ))
+  const endOfDay = new Date(today)
+  endOfDay.setUTCHours(23, 59, 59, 999)
 
   const dateFrom = startOfWeek.toISOString().slice(0, 10)
   const dateTo = today.toISOString().slice(0, 10)
+
+  const weekWindow = { gte: startOfWeek, lte: endOfDay }
 
   const [jobs, weekJobs, projections] = await Promise.all([
     prisma.job.count(),
     prisma.job.findMany({
       where: {
-        payments: { some: { datePmtReceived: { gte: startOfWeek } } },
+        payments: { some: { datePmtReceived: weekWindow } },
       },
       include: {
-        payments: { orderBy: { datePmtReceived: 'desc' }, take: 1 },
+        payments: {
+          where: { datePmtReceived: weekWindow },
+          orderBy: { datePmtReceived: 'desc' },
+          take: 1,
+        },
       },
     }),
     prisma.projectedPayment.findMany({
