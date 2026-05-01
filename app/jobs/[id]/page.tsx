@@ -171,6 +171,12 @@ export default function JobDetailPage() {
     fetchJob()
   }
 
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!confirm('Delete this payment? This cannot be undone.')) return
+    await fetch(`/api/payments/${paymentId}`, { method: 'DELETE' })
+    fetchJob()
+  }
+
   const handleDismissBanner = () => {
     setPayResult(null)
     setBannerStatuses({})
@@ -382,14 +388,15 @@ export default function JobDetailPage() {
             <tr className="border-b border-gray-100">
               <Th w="w-[18%]">Date Received</Th>
               <Th w="w-[18%]">Amount</Th>
-              <Th w="w-[18%]">Paid Thru</Th>
-              <Th w="w-[18%]">Days Since Last</Th>
-              <Th w="w-[28%]">Notes</Th>
+              <Th w="w-[16%]">Paid Thru</Th>
+              <Th w="w-[16%]">Days Since Last</Th>
+              <Th w="w-[24%]">Notes</Th>
+              <Th w="w-[8%]"></Th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {job.payments.length === 0 ? (
-              <tr><td colSpan={5} className="py-6 text-center text-gray-400">No payments logged yet.</td></tr>
+              <tr><td colSpan={6} className="py-6 text-center text-gray-400">No payments logged yet.</td></tr>
             ) : job.payments.map((p, i) => {
               const prev = job.payments[i + 1]
               const daysBetween = prev
@@ -402,6 +409,14 @@ export default function JobDetailPage() {
                   <td className="py-3 px-3 text-gray-500">{fmtDate(p.paidThruDate)}</td>
                   <td className="py-3 px-3 text-gray-500">{daysBetween ?? '—'}</td>
                   <td className="py-3 px-3 text-gray-500 text-xs truncate">{p.notes ?? '—'}</td>
+                  <td className="py-3 px-3 text-right">
+                    <button
+                      onClick={() => handleDeletePayment(p.id)}
+                      className="text-xs text-red-400 hover:text-red-600"
+                    >
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               )
             })}
