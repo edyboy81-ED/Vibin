@@ -5,16 +5,21 @@ import Link from 'next/link'
 export default async function DashboardPage() {
   const today = new Date()
   const friday = nextFriday(today)
-  const dateFrom = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10)
-  const dateTo = today.toISOString().slice(0, 10)
 
-  const weekCutoff = new Date(Date.now() - 7 * 86_400_000)
+  // Start of current work week (Monday midnight)
+  const daysSinceMonday = today.getDay() === 0 ? 6 : today.getDay() - 1
+  const startOfWeek = new Date(today)
+  startOfWeek.setDate(today.getDate() - daysSinceMonday)
+  startOfWeek.setHours(0, 0, 0, 0)
+
+  const dateFrom = startOfWeek.toISOString().slice(0, 10)
+  const dateTo = today.toISOString().slice(0, 10)
 
   const [jobs, weekJobs, projections] = await Promise.all([
     prisma.job.count(),
     prisma.job.findMany({
       where: {
-        payments: { some: { datePmtReceived: { gte: weekCutoff } } },
+        payments: { some: { datePmtReceived: { gte: startOfWeek } } },
       },
       include: {
         payments: { orderBy: { datePmtReceived: 'desc' }, take: 1 },
