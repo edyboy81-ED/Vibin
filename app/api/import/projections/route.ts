@@ -1,0 +1,190 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
+
+function parseCSVLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
+      else inQuotes = !inQuotes
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current); current = ''
+    } else {
+      current += ch
+    }
+  }
+  result.push(current)
+  return result
+}
+
+function parseCSV(text: string): Record<string, string>[] {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').map(l => l.trim()).filter(Boolean)
+  if (lines.length < 2) return []
+  const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase().replace(/\s+/g, ' '))
+  return lines.slice(1).map(line => {
+    const values = parseCSVLine(line)
+    const row: Record<string, string> = {}
+    headers.forEach((h, i) => { row[h] = (values[i] ?? '').trim() })
+    return row
+  }).filter(row => Object.values(row).some(v => v !== ''))
+}
+
+const ALIASES: Record<string, string[]> = {
+  jobNumber:             ['job', 'job #', 'job#', 'job number', 'jobnumber'],
+  estimateNumber:        ['estimate #', 'estimate#', 'estimate number', 'estimatenumber', 'est #', 'est#', 'est number'],
+  billingPeriod:         ['billing period', 'billingperiod', 'billing'],
+  monthYear:             ['month/year', 'month year', 'monthyear', 'month'],
+  estimatedAmountOwed:   ['amount owed', 'estimated amount', 'estimated amount owed', 'amountowed', 'amount'],
+  estimatedPaymentDate:  ['expected payment date', 'est payment date', 'estimated payment date', 'payment date', 'expected date', 'est date'],
+  status:                ['status'],
+  notes:                 ['notes', 'note', 'comments'],
+}
+
+function resolveColumns(headers: string[]): Record<string, string> {
+  const map: Record<string, string> = {}
+  for (const [field, aliases] of Object.entries(ALIASES)) {
+    const match = headers.find(h => aliases.includes(h.toLowerCase().replace(/\s+/g, ' ')))
+    if (match) map[field] = match
+  }
+  return map
+}
+
+function parseDate(s: string): Date | null {
+  if (!s || s === '—' || s.toLowerCase() === 'n/a') return null
+  const mdyMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/)
+  if (mdyMatch) {
+    const [, m, d, y] = mdyMatch
+    const year = y.length === 2 ? 2000 + parseInt(y) : parseInt(y)
+    const dt = new Date(year, parseInt(m) - 1, parseInt(d))
+    return isNaN(dt.getTime()) ? null : dt
+  }
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (isoMatch) {
+    const dt = new Date(s)
+    return isNaN(dt.getTime()) ? null : dt
+  }
+  return null
+}
+
+function parseMoney(s: string): number | null {
+  if (!s || s === '—') return null
+  const clean = s.replace(/[$,\s]/g, '')
+  const n = parseFloat(clean)
+  return isNaN(n) ? null : Math.round(n * 100)
+}
+
+export async function POST(req: NextRequest) {
+  const formData = await req.formData()
+  const file = formData.get('file') as File | null
+  if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
+
+  const text = await file.text()
+  const rows = parseCSV(text)
+  if (rows.length === 0) return NextResponse.json({ error: 'CSV is empty or unreadable' }, { status: 400 })
+
+  const headers = Object.keys(rows[0])
+  const colMap = resolveColumns(headers)
+
+  if (!colMap.jobNumber) {
+    return NextResponse.json({
+      error: 'Could not find a "Job #" or "Job" column.',
+      detectedColumns: headers,
+    }, { status: 400 })
+  }
+  if (!colMap.estimatedPaymentDate) {
+    return NextResponse.json({
+      error: 'Could not find an "Expected Payment Date" column.',
+      detectedColumns: headers,
+    }, { status: 400 })
+  }
+  if (!colMap.estimatedAmountOwed) {
+    return NextResponse.json({
+      error: 'Could not find an "Amount Owed" column.',
+      detectedColumns: headers,
+    }, { status: 400 })
+  }
+
+  // Pre-load all jobs and statuses
+  const [allJobs, allStatuses] = await Promise.all([
+    prisma.job.findMany({ select: { id: true, jobNumber: true, jobName: true, company: true, division: true } }),
+    prisma.projectionStatus.findMany(),
+  ])
+  const jobMap = new Map(allJobs.map(j => [j.jobNumber, j]))
+  const statusMap = new Map(allStatuses.map(s => [s.name.toLowerCase(), s]))
+  const defaultStatus = statusMap.get('projected') ?? allStatuses[0]
+
+  const stats = { created: 0, skipped: 0, rowsSkipped: 0 }
+  const errors: string[] = []
+
+  for (const [rowIndex, row] of rows.entries()) {
+    const get = (field: string) => colMap[field] ? row[colMap[field]] ?? '' : ''
+
+    const jobNumber = get('jobNumber').trim()
+    if (!jobNumber) { stats.rowsSkipped++; continue }
+
+    const job = jobMap.get(jobNumber)
+    if (!job) {
+      errors.push(`Row ${rowIndex + 2}: Job "${jobNumber}" not found — import jobs first`)
+      stats.rowsSkipped++
+      continue
+    }
+
+    const estimatedPaymentDate = parseDate(get('estimatedPaymentDate'))
+    if (!estimatedPaymentDate) {
+      errors.push(`Row ${rowIndex + 2}: Invalid or missing payment date for job ${jobNumber}`)
+      stats.rowsSkipped++
+      continue
+    }
+
+    const estimatedAmountOwed = parseMoney(get('estimatedAmountOwed'))
+    if (estimatedAmountOwed == null || estimatedAmountOwed <= 0) {
+      errors.push(`Row ${rowIndex + 2}: Invalid or missing amount for job ${jobNumber}`)
+      stats.rowsSkipped++
+      continue
+    }
+
+    const estimateNumber = get('estimateNumber') || '—'
+    const billingPeriod = get('billingPeriod') || '—'
+    const monthYear = get('monthYear') || `${estimatedPaymentDate.getMonth() + 1}/${estimatedPaymentDate.getFullYear()}`
+    const notes = get('notes') || null
+
+    const statusName = get('status').toLowerCase()
+    const status = (statusName && statusMap.get(statusName)) ? statusMap.get(statusName)! : defaultStatus
+
+    if (!status) {
+      errors.push(`Row ${rowIndex + 2}: No projection statuses configured in the system`)
+      stats.rowsSkipped++
+      continue
+    }
+
+    // Skip if identical projection already exists (same job + estimate# + date)
+    const duplicate = await prisma.projectedPayment.findFirst({
+      where: { jobId: job.id, estimateNumber, estimatedPaymentDate },
+    })
+    if (duplicate) { stats.skipped++; continue }
+
+    await prisma.projectedPayment.create({
+      data: {
+        jobId: job.id,
+        jobNumber: job.jobNumber,
+        jobName: job.jobName,
+        company: job.company,
+        division: job.division,
+        monthYear,
+        estimateNumber,
+        billingPeriod,
+        estimatedAmountOwed,
+        estimatedPaymentDate,
+        statusId: status.id,
+        isActive: true,
+        notes: notes ? { create: [{ content: notes }] } : undefined,
+      },
+    })
+    stats.created++
+  }
+
+  return NextResponse.json({ stats, errors, totalRows: rows.length, detectedColumns: Object.keys(colMap) })
+}

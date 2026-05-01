@@ -76,9 +76,14 @@ export default function ProjectionsPage() {
             </p>
           )}
         </div>
-        <Link href="/projections/new" className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700 transition-colors">
-          + Add Projection
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/import/projections" className="text-sm border border-gray-300 bg-white px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+            Import CSV
+          </Link>
+          <Link href="/projections/new" className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700 transition-colors">
+            + Add Projection
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
