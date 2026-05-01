@@ -4,12 +4,12 @@ export function dollars(cents: number): string {
 
 export function fmtDate(d: Date | string | null | undefined): string {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
+  return new Date(d).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 }
 
 export function fmtDateLong(d: Date | string | null | undefined): string {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  return new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 }
 
 // Returns YYYY-MM-DD for <input type="date"> value
