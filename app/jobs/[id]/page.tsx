@@ -65,7 +65,7 @@ export default function JobDetailPage() {
 
   useEffect(() => {
     if (job) setEditForm({
-      jobName: job.jobName, company: job.company, customer: job.customer ?? '',
+      jobNumber: job.jobNumber, jobName: job.jobName, company: job.company, customer: job.customer ?? '',
       jobStatus: job.jobStatus,
       paidThruDate: toDateInput(job.paidThruDate), billedThruDate: toDateInput(job.billedThruDate),
       nextAmountDue: job.nextAmountDue != null ? (job.nextAmountDue / 100).toFixed(2) : '',
@@ -75,18 +75,20 @@ export default function JobDetailPage() {
 
   const handleSaveJob = async () => {
     setSaving(true)
-    await fetch(`/api/jobs/${id}`, {
+    setError('')
+    const res = await fetch(`/api/jobs/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...editForm,
+        jobNumber: editForm.jobNumber.trim(),
         nextAmountDue: editForm.nextAmountDue ? Math.round(parseFloat(editForm.nextAmountDue) * 100) : null,
         customer: editForm.customer || null,
       }),
     })
     setSaving(false)
-    setEditing(false)
-    fetchJob()
+    if (res.ok) { setEditing(false); fetchJob() }
+    else { const d = await res.json(); setError(d.error ?? 'Failed to save') }
   }
 
   const handleLogPayment = async (e: React.FormEvent) => {
@@ -212,7 +214,8 @@ export default function JobDetailPage() {
           <div className="flex gap-2">
             {editing ? (
               <>
-                <button onClick={() => setEditing(false)} className="text-sm text-gray-500 px-3 py-1.5 border border-gray-300 rounded-lg">Cancel</button>
+                {error && <span className="text-xs text-red-600">{error}</span>}
+                <button onClick={() => { setEditing(false); setError('') }} className="text-sm text-gray-500 px-3 py-1.5 border border-gray-300 rounded-lg">Cancel</button>
                 <button onClick={handleSaveJob} disabled={saving} className="text-sm bg-slate-900 text-white px-4 py-1.5 rounded-lg disabled:opacity-50">
                   {saving ? 'Saving…' : 'Save'}
                 </button>
@@ -228,6 +231,7 @@ export default function JobDetailPage() {
 
         {editing ? (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Field label="Job Number"><input value={editForm.jobNumber} onChange={e => ef('jobNumber', e.target.value)} className="input font-mono" required /></Field>
             <Field label="Job Name"><input value={editForm.jobName} onChange={e => ef('jobName', e.target.value)} className="input" /></Field>
             <Field label="Customer"><input value={editForm.customer} onChange={e => ef('customer', e.target.value)} className="input" placeholder="Customer name" /></Field>
             <Field label="Company">
