@@ -5,6 +5,8 @@ import Link from 'next/link'
 export default async function DashboardPage() {
   const today = new Date()
   const friday = nextFriday(today)
+  const dateFrom = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10)
+  const dateTo = today.toISOString().slice(0, 10)
 
   const [jobs, payments, projections] = await Promise.all([
     prisma.job.count(),
@@ -53,9 +55,9 @@ export default async function DashboardPage() {
       {/* This week receipts */}
       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">This Week's Cash Receipts</h2>
       <div className="grid grid-cols-3 gap-4 mb-8">
-        <StatCard label="Legacy" value={dollars(weekLegacy)} sub={`${payments.filter(p => p.job.division === 'LEGACY').length} payments`} color="blue" />
-        <StatCard label="AB" value={dollars(weekAB)} sub={`${payments.filter(p => p.job.division === 'AB').length} payments`} color="blue" />
-        <StatCard label="Combined" value={dollars(weekLegacy + weekAB)} sub="total received" color="green" />
+        <StatCard label="Legacy" value={dollars(weekLegacy)} sub={`${payments.filter(p => p.job.division === 'LEGACY').length} payments`} color="blue" href={`/jobs?division=LEGACY&dateFrom=${dateFrom}&dateTo=${dateTo}`} />
+        <StatCard label="AB" value={dollars(weekAB)} sub={`${payments.filter(p => p.job.division === 'AB').length} payments`} color="blue" href={`/jobs?division=AB&dateFrom=${dateFrom}&dateTo=${dateTo}`} />
+        <StatCard label="Combined" value={dollars(weekLegacy + weekAB)} sub="total received" color="green" href={`/jobs?dateFrom=${dateFrom}&dateTo=${dateTo}`} />
       </div>
 
       {/* Projections */}
@@ -79,7 +81,7 @@ export default async function DashboardPage() {
   )
 }
 
-function StatCard({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
+function StatCard({ label, value, sub, color, href }: { label: string; value: string; sub: string; color: string; href?: string }) {
   const colors: Record<string, string> = {
     blue: 'border-blue-200 bg-blue-50',
     green: 'border-green-200 bg-green-50',
@@ -87,11 +89,23 @@ function StatCard({ label, value, sub, color }: { label: string; value: string; 
     orange: 'border-orange-200 bg-orange-50',
     gray: 'border-gray-200 bg-white',
   }
-  return (
-    <div className={`rounded-xl border p-4 ${colors[color] ?? colors.gray}`}>
+  const inner = (
+    <>
       <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">{label}</div>
       <div className="text-2xl font-bold font-mono mt-1 text-gray-900">{value}</div>
       <div className="text-xs text-gray-400 mt-1">{sub}</div>
+    </>
+  )
+  if (href) {
+    return (
+      <Link href={href} className={`rounded-xl border p-4 block hover:shadow-md transition-shadow ${colors[color] ?? colors.gray}`}>
+        {inner}
+      </Link>
+    )
+  }
+  return (
+    <div className={`rounded-xl border p-4 ${colors[color] ?? colors.gray}`}>
+      {inner}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { dollars, fmtDate, daysSince } from '@/lib/format'
 import { ALL_COMPANIES } from '@/lib/companies'
 import Link from 'next/link'
@@ -22,7 +23,8 @@ interface Job {
 
 const BLANK = { jobNumber: '', jobName: '', company: 'Johnson Bros Corporation', customer: '', jobStatus: 'IN_PROGRESS', nextAmountDue: '' }
 
-export default function JobsPage() {
+function JobsContent() {
+  const searchParams = useSearchParams()
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -31,8 +33,10 @@ export default function JobsPage() {
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [filterCompany, setFilterCompany] = useState('')
-  const [filterDivision, setFilterDivision] = useState('')
+  const [filterDivision, setFilterDivision] = useState(searchParams.get('division') ?? '')
   const [filterStatus, setFilterStatus] = useState('')
+  const [filterDateFrom, setFilterDateFrom] = useState(searchParams.get('dateFrom') ?? '')
+  const [filterDateTo, setFilterDateTo] = useState(searchParams.get('dateTo') ?? '')
 
   const fetchJobs = useCallback(async () => {
     const res = await fetch('/api/jobs')
@@ -44,14 +48,24 @@ export default function JobsPage() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
+    const from = filterDateFrom ? new Date(filterDateFrom) : null
+    const to = filterDateTo ? new Date(filterDateTo + 'T23:59:59') : null
     return jobs.filter(j => {
-      if (q && !j.jobNumber.toLowerCase().includes(q) && !j.jobName.toLowerCase().includes(q)) return false
+      if (q && !j.jobNumber.toLowerCase().includes(q) && !j.jobName.toLowerCase().includes(q) && !j.customer?.toLowerCase().includes(q)) return false
       if (filterCompany && j.company !== filterCompany) return false
       if (filterDivision && j.division !== filterDivision) return false
       if (filterStatus && j.jobStatus !== filterStatus) return false
+      if (from || to) {
+        const pmtDate = j.payments[0] ? new Date(j.payments[0].datePmtReceived) : null
+        if (!pmtDate) return false
+        if (from && pmtDate < from) return false
+        if (to && pmtDate > to) return false
+      }
       return true
     })
-  }, [jobs, search, filterCompany, filterDivision, filterStatus])
+  }, [jobs, search, filterCompany, filterDivision, filterStatus, filterDateFrom, filterDateTo])
+
+  const hasDateFilter = filterDateFrom || filterDateTo
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -77,16 +91,10 @@ export default function JobsPage() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-900">Cash Receipts</h1>
         <div className="flex gap-2">
-          <Link
-            href="/import"
-            className="text-sm border border-gray-300 bg-white px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-          >
+          <Link href="/import" className="text-sm border border-gray-300 bg-white px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
             Import CSV
           </Link>
-          <a
-            href="/api/jobs/export"
-            className="text-sm border border-gray-300 bg-white px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-          >
+          <a href="/api/jobs/export" className="text-sm border border-gray-300 bg-white px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
             Export CSV
           </a>
           <button
@@ -137,11 +145,11 @@ export default function JobsPage() {
       )}
 
       {/* Filters */}
-      <div className="flex gap-3 mb-4 flex-wrap">
+      <div className="flex gap-3 mb-2 flex-wrap">
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search job # or name…"
+          placeholder="Search job #, name, or customer…"
           className="input flex-1 min-w-48"
         />
         <select value={filterDivision} onChange={e => setFilterDivision(e.target.value)} className="input w-36">
@@ -160,10 +168,31 @@ export default function JobsPage() {
         </select>
       </div>
 
+      {/* Date filter row */}
+      <div className="flex gap-3 mb-4 flex-wrap items-center">
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Payment date from</label>
+          <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="input w-40" />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-gray-500">to</label>
+          <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="input w-40" />
+        </div>
+        {hasDateFilter && (
+          <button
+            onClick={() => { setFilterDateFrom(''); setFilterDateTo('') }}
+            className="text-xs text-gray-400 hover:text-gray-600 underline"
+          >
+            Clear dates
+          </button>
+        )}
+      </div>
+
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
           {filtered.length} of {jobs.length} jobs
+          {hasDateFilter && <span className="ml-2 text-blue-600 font-medium">· filtered by payment date</span>}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full table-fixed text-sm">
@@ -221,6 +250,14 @@ export default function JobsPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function JobsPage() {
+  return (
+    <Suspense fallback={<div className="text-gray-400 p-8">Loading…</div>}>
+      <JobsContent />
+    </Suspense>
   )
 }
 
