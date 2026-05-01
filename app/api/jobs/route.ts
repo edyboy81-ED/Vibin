@@ -15,7 +15,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { jobNumber, jobName, company, jobStatus, paidThruDate, billedThruDate, nextAmountDue, notes } = body
+  const { jobNumber, jobName, company, jobStatus, paidThruDate, billedThruDate, nextAmountDue, customer, notes } = body
 
   if (!jobNumber || !jobName || !company) {
     return NextResponse.json({ error: 'jobNumber, jobName, and company are required' }, { status: 400 })
@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
         paidThruDate: paidThruDate ? new Date(paidThruDate) : null,
         billedThruDate: billedThruDate ? new Date(billedThruDate) : null,
         nextAmountDue: nextAmountDue != null ? Math.round(Number(nextAmountDue)) : null,
+        customer: customer ? String(customer).trim() : null,
         notes: notes ? String(notes) : null,
       },
     })

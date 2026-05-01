@@ -11,7 +11,7 @@ export async function GET() {
   })
 
   const header = [
-    'Job', 'Job Name', 'Job Status', 'Paid Thru Date',
+    'Job', 'Job Name', 'Customer', 'Job Status', 'Paid Thru Date',
     'Date Pmt Received', 'Days Last Paid', 'Amount Received',
     'Next Amount Due', 'Billed Thru Date', 'Company',
   ]
@@ -28,6 +28,7 @@ export async function GET() {
     return [
       job.jobNumber,
       job.jobName,
+      job.customer ?? '',
       job.jobStatus === 'IN_PROGRESS' ? 'In progress' : 'Closed',
       fmtDate(job.paidThruDate),
       latest ? fmtDate(latest.datePmtReceived) : '',

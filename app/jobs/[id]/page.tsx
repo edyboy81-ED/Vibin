@@ -8,7 +8,7 @@ import Link from 'next/link'
 
 interface Job {
   id: string; jobNumber: string; jobName: string; company: string
-  division: string; jobStatus: string; paidThruDate: string | null
+  division: string; customer: string | null; jobStatus: string; paidThruDate: string | null
   billedThruDate: string | null; nextAmountDue: number | null; notes: string | null
   payments: Payment[]
   projections: Projection[]
@@ -65,7 +65,8 @@ export default function JobDetailPage() {
 
   useEffect(() => {
     if (job) setEditForm({
-      jobName: job.jobName, company: job.company, jobStatus: job.jobStatus,
+      jobName: job.jobName, company: job.company, customer: job.customer ?? '',
+      jobStatus: job.jobStatus,
       paidThruDate: toDateInput(job.paidThruDate), billedThruDate: toDateInput(job.billedThruDate),
       nextAmountDue: job.nextAmountDue != null ? (job.nextAmountDue / 100).toFixed(2) : '',
       notes: job.notes ?? '',
@@ -80,6 +81,7 @@ export default function JobDetailPage() {
       body: JSON.stringify({
         ...editForm,
         nextAmountDue: editForm.nextAmountDue ? Math.round(parseFloat(editForm.nextAmountDue) * 100) : null,
+        customer: editForm.customer || null,
       }),
     })
     setSaving(false)
@@ -221,6 +223,7 @@ export default function JobDetailPage() {
         {editing ? (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Field label="Job Name"><input value={editForm.jobName} onChange={e => ef('jobName', e.target.value)} className="input" /></Field>
+            <Field label="Customer"><input value={editForm.customer} onChange={e => ef('customer', e.target.value)} className="input" placeholder="Customer name" /></Field>
             <Field label="Company">
               <select value={editForm.company} onChange={e => ef('company', e.target.value)} className="input">
                 {ALL_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -243,6 +246,7 @@ export default function JobDetailPage() {
           <dl className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4 text-sm">
             <Pair label="Job #" value={job.jobNumber} mono />
             <Pair label="Job Name" value={job.jobName} />
+            <Pair label="Customer" value={job.customer ?? ''} />
             <Pair label="Company" value={job.company} />
             <Pair label="Division" value={job.division} />
             <Pair label="Status" value={job.jobStatus === 'IN_PROGRESS' ? 'In Progress' : 'Closed'} />

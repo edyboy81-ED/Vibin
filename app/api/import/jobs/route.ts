@@ -45,6 +45,7 @@ const ALIASES: Record<string, string[]> = {
   jobNumber:        ['job', 'job #', 'job#', 'job number', 'jobnumber'],
   jobName:          ['job name', 'jobname', 'name'],
   company:          ['company'],
+  customer:         ['customer', 'customer name', 'customername'],
   jobStatus:        ['job status', 'jobstatus', 'status'],
   paidThruDate:     ['paid thru date', 'paidthrudate', 'paid thru', 'paid through date', 'paid through'],
   billedThruDate:   ['billed thru date', 'billedthrudate', 'billed thru', 'billed through date', 'billed through'],
@@ -134,6 +135,7 @@ export async function POST(req: NextRequest) {
     const jobName = get('jobName') || jobNumber
     const company = get('company') || 'Johnson Bros Corporation'
     const division = getDivision(company)
+    const customer = get('customer') || null
     const jobStatus = parseJobStatus(get('jobStatus'))
     const paidThruDate = parseDate(get('paidThruDate'))
     const billedThruDate = parseDate(get('billedThruDate'))
@@ -146,12 +148,12 @@ export async function POST(req: NextRequest) {
       if (existing) {
         await prisma.job.update({
           where: { jobNumber },
-          data: { jobName, company, division, jobStatus, paidThruDate, billedThruDate, nextAmountDue, notes },
+          data: { jobName, company, division, customer, jobStatus, paidThruDate, billedThruDate, nextAmountDue, notes },
         })
         stats.jobsUpdated++
       } else {
         await prisma.job.create({
-          data: { jobNumber, jobName, company, division, jobStatus, paidThruDate, billedThruDate, nextAmountDue, notes },
+          data: { jobNumber, jobName, company, division, customer, jobStatus, paidThruDate, billedThruDate, nextAmountDue, notes },
         })
         stats.jobsCreated++
       }

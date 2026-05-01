@@ -24,7 +24,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 export async function PUT(req: NextRequest, { params }: Ctx) {
   const { id } = await params
   const body = await req.json()
-  const { jobName, company, jobStatus, paidThruDate, billedThruDate, nextAmountDue, notes } = body
+  const { jobName, company, jobStatus, paidThruDate, billedThruDate, nextAmountDue, customer, notes } = body
 
   const job = await prisma.job.update({
     where: { id },
@@ -36,6 +36,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
       paidThruDate: paidThruDate !== undefined ? (paidThruDate ? new Date(paidThruDate) : null) : undefined,
       billedThruDate: billedThruDate !== undefined ? (billedThruDate ? new Date(billedThruDate) : null) : undefined,
       nextAmountDue: nextAmountDue !== undefined ? (nextAmountDue != null ? Math.round(Number(nextAmountDue)) : null) : undefined,
+      customer: customer !== undefined ? (customer ? String(customer).trim() : null) : undefined,
       notes: notes !== undefined ? (notes || null) : undefined,
     },
   })

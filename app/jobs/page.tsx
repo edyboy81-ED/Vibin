@@ -11,6 +11,7 @@ interface Job {
   jobName: string
   company: string
   division: string
+  customer: string | null
   jobStatus: string
   paidThruDate: string | null
   billedThruDate: string | null
@@ -19,7 +20,7 @@ interface Job {
   _count: { projections: number }
 }
 
-const BLANK = { jobNumber: '', jobName: '', company: 'Johnson Bros Corporation', jobStatus: 'IN_PROGRESS', nextAmountDue: '' }
+const BLANK = { jobNumber: '', jobName: '', company: 'Johnson Bros Corporation', customer: '', jobStatus: 'IN_PROGRESS', nextAmountDue: '' }
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([])
@@ -109,6 +110,9 @@ export default function JobsPage() {
             <Field label="Job Name *">
               <input value={form.jobName} onChange={e => set('jobName', e.target.value)} className="input" required />
             </Field>
+            <Field label="Customer">
+              <input value={form.customer} onChange={e => set('customer', e.target.value)} className="input" placeholder="Customer name" />
+            </Field>
             <Field label="Company *">
               <select value={form.company} onChange={e => set('company', e.target.value)} className="input">
                 {ALL_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -187,7 +191,10 @@ export default function JobsPage() {
                 return (
                   <tr key={job.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => window.location.href = `/jobs/${job.id}`}>
                     <td className="px-4 py-3 font-mono text-xs font-medium">{job.jobNumber}</td>
-                    <td className="px-4 py-3 text-gray-800 truncate">{job.jobName}</td>
+                    <td className="px-4 py-3 truncate">
+                      <div className="text-gray-800 truncate">{job.jobName}</div>
+                      {job.customer && <div className="text-xs text-gray-400 truncate">{job.customer}</div>}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="text-xs text-gray-600 truncate">{job.company}</div>
                       <div className="text-xs text-gray-400">{job.division}</div>

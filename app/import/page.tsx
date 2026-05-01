@@ -84,6 +84,7 @@ export default function ImportPage() {
             <span><span className="font-mono text-gray-700">Job</span> or <span className="font-mono text-gray-700">Job #</span> — job number <span className="text-red-500">*required</span></span>
             <span><span className="font-mono text-gray-700">Job Name</span></span>
             <span><span className="font-mono text-gray-700">Company</span></span>
+            <span><span className="font-mono text-gray-700">Customer</span></span>
             <span><span className="font-mono text-gray-700">Job Status</span> — In Progress / Closed</span>
             <span><span className="font-mono text-gray-700">Date Pmt Received</span></span>
             <span><span className="font-mono text-gray-700">Amount Received</span></span>
