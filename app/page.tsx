@@ -8,15 +8,17 @@ export default async function DashboardPage() {
   const dateFrom = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10)
   const dateTo = today.toISOString().slice(0, 10)
 
-  const [jobs, payments, projections] = await Promise.all([
+  const weekCutoff = new Date(Date.now() - 7 * 86_400_000)
+
+  const [jobs, weekJobs, projections] = await Promise.all([
     prisma.job.count(),
-    prisma.payment.findMany({
+    prisma.job.findMany({
       where: {
-        datePmtReceived: {
-          gte: new Date(Date.now() - 7 * 86_400_000),
-        },
+        payments: { some: { datePmtReceived: { gte: weekCutoff } } },
       },
-      include: { job: { select: { division: true } } },
+      include: {
+        payments: { orderBy: { datePmtReceived: 'desc' }, take: 1 },
+      },
     }),
     prisma.projectedPayment.findMany({
       where: { isActive: true },
@@ -24,8 +26,10 @@ export default async function DashboardPage() {
     }),
   ])
 
-  const weekLegacy = payments.filter(p => p.job.division === 'LEGACY').reduce((s, p) => s + p.amountReceived, 0)
-  const weekAB = payments.filter(p => p.job.division === 'AB').reduce((s, p) => s + p.amountReceived, 0)
+  const weekLegacyJobs = weekJobs.filter(j => j.division === 'LEGACY')
+  const weekABJobs = weekJobs.filter(j => j.division === 'AB')
+  const weekLegacy = weekLegacyJobs.reduce((s, j) => s + (j.payments[0]?.amountReceived ?? 0), 0)
+  const weekAB = weekABJobs.reduce((s, j) => s + (j.payments[0]?.amountReceived ?? 0), 0)
 
   const nextWeekEnd = new Date(friday.getTime() + 7 * 86_400_000)
   const nextWeekProjections = projections.filter(p => new Date(p.estimatedPaymentDate) <= nextWeekEnd)
@@ -55,9 +59,9 @@ export default async function DashboardPage() {
       {/* This week receipts */}
       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">This Week's Cash Receipts</h2>
       <div className="grid grid-cols-3 gap-4 mb-8">
-        <StatCard label="Legacy" value={dollars(weekLegacy)} sub={`${payments.filter(p => p.job.division === 'LEGACY').length} payments`} color="blue" href={`/jobs?division=LEGACY&dateFrom=${dateFrom}&dateTo=${dateTo}`} />
-        <StatCard label="AB" value={dollars(weekAB)} sub={`${payments.filter(p => p.job.division === 'AB').length} payments`} color="blue" href={`/jobs?division=AB&dateFrom=${dateFrom}&dateTo=${dateTo}`} />
-        <StatCard label="Combined" value={dollars(weekLegacy + weekAB)} sub="total received" color="green" href={`/jobs?dateFrom=${dateFrom}&dateTo=${dateTo}`} />
+        <StatCard label="Legacy" value={dollars(weekLegacy)} sub={`${weekLegacyJobs.length} jobs`} color="blue" href={`/jobs?division=LEGACY&dateFrom=${dateFrom}&dateTo=${dateTo}`} />
+        <StatCard label="AB" value={dollars(weekAB)} sub={`${weekABJobs.length} jobs`} color="blue" href={`/jobs?division=AB&dateFrom=${dateFrom}&dateTo=${dateTo}`} />
+        <StatCard label="Combined" value={dollars(weekLegacy + weekAB)} sub={`${weekJobs.length} jobs`} color="green" href={`/jobs?dateFrom=${dateFrom}&dateTo=${dateTo}`} />
       </div>
 
       {/* Projections */}
