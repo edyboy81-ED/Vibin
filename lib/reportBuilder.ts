@@ -1,5 +1,16 @@
 import { prisma } from './db'
-import { startOfDay, endOfDay, addDays, dollars, fmtDate, fmtDateLong } from './format'
+import { dollars, fmtDate } from './format'
+
+// UTC-safe helpers used only within this module
+function utcStartOfDay(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+}
+function utcEndOfDay(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999))
+}
+function utcAddDays(d: Date, n: number): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + n))
+}
 
 export interface ReportSection {
   date: string           // display label e.g. "4/24/26"
@@ -57,22 +68,23 @@ export interface ReportData {
 }
 
 export async function buildReport(reportDate: Date): Promise<ReportData> {
-  const friday = startOfDay(reportDate)
+  // Parse as UTC-midnight regardless of how the Date was constructed
+  const friday = utcStartOfDay(reportDate)
 
   // This week: Monday through report Friday
-  const weekStart = startOfDay(addDays(friday, -4))
-  const weekEnd = endOfDay(friday)
+  const weekStart = utcStartOfDay(utcAddDays(friday, -4))
+  const weekEnd = utcEndOfDay(friday)
 
   // Next week: following Monday through following Friday
-  const nextWeekStart = startOfDay(addDays(friday, 3))
-  const nextWeekEnd = endOfDay(addDays(friday, 7))
+  const nextWeekStart = utcStartOfDay(utcAddDays(friday, 3))
+  const nextWeekEnd = utcEndOfDay(utcAddDays(friday, 7))
 
   // Beyond next week
-  const futureStart = startOfDay(addDays(friday, 8))
+  const futureStart = utcStartOfDay(utcAddDays(friday, 8))
 
   // Last week window: Mon–Fri of the previous week
-  const lastWeekStart = startOfDay(addDays(friday, -11))
-  const lastWeekEnd = endOfDay(addDays(friday, -7))
+  const lastWeekStart = utcStartOfDay(utcAddDays(friday, -11))
+  const lastWeekEnd = utcEndOfDay(utcAddDays(friday, -7))
 
   // --- Cash receipts this week ---
   const weekPayments = await prisma.payment.findMany({

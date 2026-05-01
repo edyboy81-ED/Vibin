@@ -1,10 +1,13 @@
 import { prisma } from '@/lib/db'
-import { dollars, fmtDate, daysSince, nextFriday } from '@/lib/format'
+import { dollars, fmtDate } from '@/lib/format'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
   const today = new Date()
-  const friday = nextFriday(today)
+  // Next report Friday: always the upcoming Friday (not today if today is Friday)
+  const dayOfWeekForFriday = today.getUTCDay()
+  const daysUntilFriday = dayOfWeekForFriday === 5 ? 7 : (5 - dayOfWeekForFriday + 7) % 7
+  const friday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + daysUntilFriday))
 
   const startOfWeek = new Date(Date.UTC(
     today.getUTCFullYear(),
@@ -44,17 +47,20 @@ export default async function DashboardPage() {
   const weekLegacy = weekLegacyJobs.reduce((s, j) => s + (j.payments[0]?.amountReceived ?? 0), 0)
   const weekAB = weekABJobs.reduce((s, j) => s + (j.payments[0]?.amountReceived ?? 0), 0)
 
-  // Next week = today through next Friday (the upcoming report window)
-  // Future = anything beyond next Friday
-  const todayMidnight = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()))
-  const nextFridayDate = friday.toISOString().slice(0, 10)
-  const nextFridayPlus1 = new Date(friday.getTime() + 86_400_000).toISOString().slice(0, 10)
+  // Next calendar week: Mon–Fri, always the upcoming week regardless of today's day (UTC)
+  const dayOfWeek = today.getUTCDay() // 0=Sun, 1=Mon, ..., 6=Sat
+  const daysUntilNextMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek
+  const nextWeekMon = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + daysUntilNextMonday))
+  const nextWeekFri = new Date(Date.UTC(nextWeekMon.getUTCFullYear(), nextWeekMon.getUTCMonth(), nextWeekMon.getUTCDate() + 4))
+  const nextWeekMonStr = nextWeekMon.toISOString().slice(0, 10)
+  const nextWeekFriStr = nextWeekFri.toISOString().slice(0, 10)
+  const afterNextWeekFriStr = new Date(nextWeekFri.getTime() + 86_400_000).toISOString().slice(0, 10)
 
   const nextWeekProjections = projections.filter(p => {
     const d = new Date(p.estimatedPaymentDate)
-    return d >= todayMidnight && d <= friday
+    return d >= nextWeekMon && d <= nextWeekFri
   })
-  const futureProjections = projections.filter(p => new Date(p.estimatedPaymentDate) > friday)
+  const futureProjections = projections.filter(p => new Date(p.estimatedPaymentDate) > nextWeekFri)
 
   const nextWeekTotal = nextWeekProjections.reduce((s, p) => s + p.estimatedAmountOwed, 0)
   const futureTotal = futureProjections.reduce((s, p) => s + p.estimatedAmountOwed, 0)
@@ -88,8 +94,8 @@ export default async function DashboardPage() {
       {/* Projections */}
       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Projected Payments</h2>
       <div className="grid grid-cols-4 gap-4 mb-8">
-        <StatCard label="Next Week" value={dollars(nextWeekTotal)} sub={`${nextWeekProjections.length} projections`} color="yellow" href={`/projections?dateFrom=${dateTo}&dateTo=${nextFridayDate}`} />
-        <StatCard label="Future" value={dollars(futureTotal)} sub={`${futureProjections.length} projections`} color="gray" href={`/projections?dateFrom=${nextFridayPlus1}`} />
+        <StatCard label="Next Week" value={dollars(nextWeekTotal)} sub={`${nextWeekProjections.length} projections`} color="yellow" href={`/projections?dateFrom=${nextWeekMonStr}&dateTo=${nextWeekFriStr}`} />
+        <StatCard label="Future" value={dollars(futureTotal)} sub={`${futureProjections.length} projections`} color="gray" href={`/projections?dateFrom=${afterNextWeekFriStr}`} />
         <StatCard label="Projected" value={projectedCount.toString()} sub="awaiting payment" color="blue" href="/projections?statusName=Projected" />
         <StatCard label="Partial" value={partialCount.toString()} sub="partially received" color="orange" href="/projections?statusName=Partial" />
       </div>

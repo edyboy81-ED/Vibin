@@ -16,6 +16,11 @@ export default function ReportPage() {
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  const isFriday = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(Date.UTC(y, m - 1, d)).getUTCDay() === 5
+  }
+
   const loadReport = useCallback(async () => {
     setLoading(true)
     setEmailBody('')
@@ -65,13 +70,22 @@ export default function ReportPage() {
           <input
             type="date"
             value={date}
-            onChange={e => { setDate(e.target.value); setData(null); setEmailBody('') }}
+            onChange={e => {
+              const val = e.target.value
+              if (val && !isFriday(val)) return
+              setDate(val)
+              setData(null)
+              setEmailBody('')
+            }}
             className="input"
           />
+          {date && !isFriday(date) && (
+            <p className="text-xs text-red-500 mt-1">Please select a Friday.</p>
+          )}
         </div>
         <button
           onClick={loadReport}
-          disabled={loading || !date}
+          disabled={loading || !date || !isFriday(date)}
           className="bg-slate-900 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
         >
           {loading ? 'Loading…' : 'Preview Report'}
