@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { dollars, fmtDate } from '@/lib/format'
 import { ALL_COMPANIES } from '@/lib/companies'
 import Link from 'next/link'
@@ -16,7 +17,8 @@ interface Projection {
 
 interface Status { id: string; name: string; color: string }
 
-export default function ProjectionsPage() {
+function ProjectionsContent() {
+  const searchParams = useSearchParams()
   const [projections, setProjections] = useState<Projection[]>([])
   const [statuses, setStatuses] = useState<Status[]>([])
   const [loading, setLoading] = useState(true)
@@ -24,6 +26,8 @@ export default function ProjectionsPage() {
   const [filterDivision, setFilterDivision] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterCompany, setFilterCompany] = useState('')
+  const [filterDateFrom, setFilterDateFrom] = useState(searchParams.get('dateFrom') ?? '')
+  const [filterDateTo, setFilterDateTo] = useState(searchParams.get('dateTo') ?? '')
   const [showInactive, setShowInactive] = useState(false)
 
   const fetchData = useCallback(async () => {
@@ -38,17 +42,33 @@ export default function ProjectionsPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  // Resolve statusName URL param to a status ID once statuses are loaded
+  useEffect(() => {
+    const statusName = searchParams.get('statusName')
+    if (statusName && statuses.length > 0) {
+      const match = statuses.find(s => s.name.toLowerCase() === statusName.toLowerCase())
+      if (match) setFilterStatus(match.id)
+    }
+  }, [statuses, searchParams])
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
+    const from = filterDateFrom ? new Date(filterDateFrom) : null
+    const to = filterDateTo ? new Date(filterDateTo + 'T23:59:59') : null
     return projections.filter(p => {
       if (!showInactive && !p.isActive) return false
       if (q && !p.jobNumber.toLowerCase().includes(q) && !p.jobName.toLowerCase().includes(q)) return false
       if (filterDivision && p.division !== filterDivision) return false
       if (filterStatus && p.status.id !== filterStatus) return false
       if (filterCompany && p.company !== filterCompany) return false
+      if (from || to) {
+        const d = new Date(p.estimatedPaymentDate)
+        if (from && d < from) return false
+        if (to && d > to) return false
+      }
       return true
     })
-  }, [projections, search, filterDivision, filterStatus, filterCompany, showInactive])
+  }, [projections, search, filterDivision, filterStatus, filterCompany, showInactive, filterDateFrom, filterDateTo])
 
   // Group by payment date
   const grouped = useMemo(() => {
@@ -64,6 +84,7 @@ export default function ProjectionsPage() {
   }, [filtered])
 
   const totalFiltered = filtered.reduce((s, p) => s + p.estimatedAmountOwed, 0)
+  const hasDateFilter = filterDateFrom || filterDateTo
 
   return (
     <div>
@@ -73,6 +94,7 @@ export default function ProjectionsPage() {
           {!loading && (
             <p className="text-sm text-gray-400 mt-1">
               {filtered.length} projections · {dollars(totalFiltered)} total
+              {hasDateFilter && <span className="ml-2 text-blue-600 font-medium">· filtered by date</span>}
             </p>
           )}
         </div>
@@ -87,7 +109,7 @@ export default function ProjectionsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-4 flex-wrap items-center">
+      <div className="flex gap-3 mb-2 flex-wrap items-center">
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -111,6 +133,26 @@ export default function ProjectionsPage() {
           <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} />
           Show inactive
         </label>
+      </div>
+
+      {/* Date filter row */}
+      <div className="flex gap-3 mb-4 flex-wrap items-center">
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Payment date from</label>
+          <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="input w-40" />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-gray-500">to</label>
+          <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="input w-40" />
+        </div>
+        {hasDateFilter && (
+          <button
+            onClick={() => { setFilterDateFrom(''); setFilterDateTo('') }}
+            className="text-xs text-gray-400 hover:text-gray-600 underline"
+          >
+            Clear dates
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -157,6 +199,14 @@ export default function ProjectionsPage() {
         )
       })}
     </div>
+  )
+}
+
+export default function ProjectionsPage() {
+  return (
+    <Suspense fallback={<div className="text-gray-400 p-8">Loading…</div>}>
+      <ProjectionsContent />
+    </Suspense>
   )
 }
 

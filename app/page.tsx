@@ -44,9 +44,17 @@ export default async function DashboardPage() {
   const weekLegacy = weekLegacyJobs.reduce((s, j) => s + (j.payments[0]?.amountReceived ?? 0), 0)
   const weekAB = weekABJobs.reduce((s, j) => s + (j.payments[0]?.amountReceived ?? 0), 0)
 
-  const nextWeekEnd = new Date(friday.getTime() + 7 * 86_400_000)
-  const nextWeekProjections = projections.filter(p => new Date(p.estimatedPaymentDate) <= nextWeekEnd)
-  const futureProjections = projections.filter(p => new Date(p.estimatedPaymentDate) > nextWeekEnd)
+  // Next week = today through next Friday (the upcoming report window)
+  // Future = anything beyond next Friday
+  const todayMidnight = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()))
+  const nextFridayDate = friday.toISOString().slice(0, 10)
+  const nextFridayPlus1 = new Date(friday.getTime() + 86_400_000).toISOString().slice(0, 10)
+
+  const nextWeekProjections = projections.filter(p => {
+    const d = new Date(p.estimatedPaymentDate)
+    return d >= todayMidnight && d <= friday
+  })
+  const futureProjections = projections.filter(p => new Date(p.estimatedPaymentDate) > friday)
 
   const nextWeekTotal = nextWeekProjections.reduce((s, p) => s + p.estimatedAmountOwed, 0)
   const futureTotal = futureProjections.reduce((s, p) => s + p.estimatedAmountOwed, 0)
@@ -80,10 +88,10 @@ export default async function DashboardPage() {
       {/* Projections */}
       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Projected Payments</h2>
       <div className="grid grid-cols-4 gap-4 mb-8">
-        <StatCard label="Next Week" value={dollars(nextWeekTotal)} sub={`${nextWeekProjections.length} projections`} color="yellow" />
-        <StatCard label="Future" value={dollars(futureTotal)} sub={`${futureProjections.length} projections`} color="gray" />
-        <StatCard label="Projected" value={projectedCount.toString()} sub="awaiting payment" color="blue" />
-        <StatCard label="Partial" value={partialCount.toString()} sub="partially received" color="orange" />
+        <StatCard label="Next Week" value={dollars(nextWeekTotal)} sub={`${nextWeekProjections.length} projections`} color="yellow" href={`/projections?dateFrom=${dateTo}&dateTo=${nextFridayDate}`} />
+        <StatCard label="Future" value={dollars(futureTotal)} sub={`${futureProjections.length} projections`} color="gray" href={`/projections?dateFrom=${nextFridayPlus1}`} />
+        <StatCard label="Projected" value={projectedCount.toString()} sub="awaiting payment" color="blue" href="/projections?statusName=Projected" />
+        <StatCard label="Partial" value={partialCount.toString()} sub="partially received" color="orange" href="/projections?statusName=Partial" />
       </div>
 
       {/* Quick links */}
