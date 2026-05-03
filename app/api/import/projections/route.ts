@@ -34,6 +34,8 @@ function parseCSV(text: string): Record<string, string>[] {
 
 const ALIASES: Record<string, string[]> = {
   jobNumber:             ['job', 'job #', 'job#', 'job number', 'jobnumber'],
+  jobName:               ['job name', 'jobname', 'name'],
+  company:               ['company'],
   estimateNumber:        ['estimate #', 'estimate#', 'estimate number', 'estimatenumber', 'est #', 'est#', 'est number'],
   billingPeriod:         ['billing period', 'billingperiod', 'billing'],
   monthYear:             ['month/year', 'month year', 'monthyear', 'month'],
@@ -107,7 +109,6 @@ export async function POST(req: NextRequest) {
     }, { status: 400 })
   }
 
-  // Pre-load all jobs and statuses
   const [allJobs, allStatuses] = await Promise.all([
     prisma.job.findMany({ select: { id: true, jobNumber: true, jobName: true, company: true, division: true } }),
     prisma.projectionStatus.findMany(),
@@ -118,19 +119,13 @@ export async function POST(req: NextRequest) {
 
   const stats = { created: 0, skipped: 0, rowsSkipped: 0 }
   const errors: string[] = []
+  const unmatched: object[] = []
 
   for (const [rowIndex, row] of rows.entries()) {
     const get = (field: string) => colMap[field] ? row[colMap[field]] ?? '' : ''
 
     const jobNumber = get('jobNumber').trim()
     if (!jobNumber) { stats.rowsSkipped++; continue }
-
-    const job = jobMap.get(jobNumber)
-    if (!job) {
-      errors.push(`Row ${rowIndex + 2}: Job "${jobNumber}" not found — import jobs first`)
-      stats.rowsSkipped++
-      continue
-    }
 
     const estimatedPaymentDate = parseDate(get('estimatedPaymentDate'))
     if (!estimatedPaymentDate) {
@@ -155,12 +150,33 @@ export async function POST(req: NextRequest) {
     const status = (statusName && statusMap.get(statusName)) ? statusMap.get(statusName)! : defaultStatus
 
     if (!status) {
-      errors.push(`Row ${rowIndex + 2}: No projection statuses configured in the system`)
+      errors.push(`Row ${rowIndex + 2}: No projection statuses configured`)
       stats.rowsSkipped++
       continue
     }
 
-    // Skip if identical projection already exists (same job + estimate# + date)
+    const job = jobMap.get(jobNumber)
+
+    if (!job) {
+      // Collect for the user to review and create jobs manually
+      unmatched.push({
+        rowIndex: rowIndex + 2,
+        jobNumber,
+        jobName: get('jobName') || '',
+        company: get('company') || '',
+        estimateNumber,
+        billingPeriod,
+        monthYear,
+        estimatedAmountOwed,
+        estimatedPaymentDate: estimatedPaymentDate.toISOString(),
+        statusId: status.id,
+        statusName: status.name,
+        notes,
+      })
+      continue
+    }
+
+    // Check for duplicate
     const duplicate = await prisma.projectedPayment.findFirst({
       where: { jobId: job.id, estimateNumber, estimatedPaymentDate },
     })
@@ -186,5 +202,5 @@ export async function POST(req: NextRequest) {
     stats.created++
   }
 
-  return NextResponse.json({ stats, errors, totalRows: rows.length, detectedColumns: Object.keys(colMap) })
+  return NextResponse.json({ stats, errors, unmatched, totalRows: rows.length, detectedColumns: Object.keys(colMap) })
 }
