@@ -41,7 +41,6 @@ export default async function DashboardPage() {
         payments: {
           where: { datePmtReceived: weekWindow },
           orderBy: { datePmtReceived: 'desc' },
-          take: 1,
         },
       },
     }),
@@ -61,8 +60,8 @@ export default async function DashboardPage() {
 
   const weekLegacyJobs = weekJobs.filter(j => j.division === 'LEGACY')
   const weekABJobs = weekJobs.filter(j => j.division === 'AB')
-  const weekLegacy = weekLegacyJobs.reduce((s, j) => s + (j.payments[0]?.amountReceived ?? 0), 0)
-  const weekAB = weekABJobs.reduce((s, j) => s + (j.payments[0]?.amountReceived ?? 0), 0)
+  const weekLegacy = weekLegacyJobs.reduce((s, j) => s + j.payments.reduce((ps, p) => ps + p.amountReceived, 0), 0)
+  const weekAB = weekABJobs.reduce((s, j) => s + j.payments.reduce((ps, p) => ps + p.amountReceived, 0), 0)
 
   const nextWeekTotal = nextWeekProjections.reduce((s, p) => s + p.estimatedAmountOwed, 0)
   const futureTotal = futureProjections.reduce((s, p) => s + p.estimatedAmountOwed, 0)

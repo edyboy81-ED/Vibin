@@ -2,30 +2,33 @@
 
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { dollars, fmtDate, daysSince } from '@/lib/format'
+import { dollars, fmtDate } from '@/lib/format'
 import { ALL_COMPANIES } from '@/lib/companies'
 import Link from 'next/link'
 
-interface Job {
+interface PaymentRow {
   id: string
-  jobNumber: string
-  jobName: string
-  company: string
-  division: string
-  customer: string | null
-  jobStatus: string
+  datePmtReceived: string
+  amountReceived: number
   paidThruDate: string | null
-  billedThruDate: string | null
-  nextAmountDue: number | null
-  payments: { datePmtReceived: string; amountReceived: number }[]
-  _count: { projections: number }
+  notes: string | null
+  job: {
+    id: string
+    jobNumber: string
+    jobName: string
+    company: string
+    division: string
+    customer: string | null
+    jobStatus: string
+    _count: { projections: number }
+  }
 }
 
 const BLANK = { jobNumber: '', jobName: '', company: 'Johnson Bros Corporation', customer: '', jobStatus: 'IN_PROGRESS', nextAmountDue: '' }
 
 function JobsContent() {
   const searchParams = useSearchParams()
-  const [jobs, setJobs] = useState<Job[]>([])
+  const [payments, setPayments] = useState<PaymentRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(BLANK)
@@ -38,33 +41,33 @@ function JobsContent() {
   const [filterDateFrom, setFilterDateFrom] = useState(searchParams.get('dateFrom') ?? '')
   const [filterDateTo, setFilterDateTo] = useState(searchParams.get('dateTo') ?? '')
 
-  const fetchJobs = useCallback(async () => {
-    const res = await fetch('/api/jobs')
-    setJobs(await res.json())
+  const fetchPayments = useCallback(async () => {
+    const res = await fetch('/api/payments')
+    setPayments(await res.json())
     setLoading(false)
   }, [])
 
-  useEffect(() => { fetchJobs() }, [fetchJobs])
+  useEffect(() => { fetchPayments() }, [fetchPayments])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     const from = filterDateFrom ? new Date(filterDateFrom) : null
     const to = filterDateTo ? new Date(filterDateTo + 'T23:59:59') : null
-    return jobs.filter(j => {
-      if (q && !j.jobNumber.toLowerCase().includes(q) && !j.jobName.toLowerCase().includes(q) && !j.customer?.toLowerCase().includes(q)) return false
-      if (filterCompany && j.company !== filterCompany) return false
-      if (filterDivision && j.division !== filterDivision) return false
-      if (filterStatus && j.jobStatus !== filterStatus) return false
+    return payments.filter(p => {
+      if (q && !p.job.jobNumber.toLowerCase().includes(q) && !p.job.jobName.toLowerCase().includes(q) && !p.job.customer?.toLowerCase().includes(q)) return false
+      if (filterCompany && p.job.company !== filterCompany) return false
+      if (filterDivision && p.job.division !== filterDivision) return false
+      if (filterStatus && p.job.jobStatus !== filterStatus) return false
       if (from || to) {
-        const pmtDate = j.payments[0] ? new Date(j.payments[0].datePmtReceived) : null
-        if (!pmtDate) return false
-        if (from && pmtDate < from) return false
-        if (to && pmtDate > to) return false
+        const d = new Date(p.datePmtReceived)
+        if (from && d < from) return false
+        if (to && d > to) return false
       }
       return true
     })
-  }, [jobs, search, filterCompany, filterDivision, filterStatus, filterDateFrom, filterDateTo])
+  }, [payments, search, filterCompany, filterDivision, filterStatus, filterDateFrom, filterDateTo])
 
+  const filteredTotal = useMemo(() => filtered.reduce((s, p) => s + p.amountReceived, 0), [filtered])
   const hasDateFilter = filterDateFrom || filterDateTo
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
@@ -82,7 +85,7 @@ function JobsContent() {
       }),
     })
     setSubmitting(false)
-    if (res.ok) { setForm(BLANK); setShowForm(false); fetchJobs() }
+    if (res.ok) { setForm(BLANK); setShowForm(false) }
     else { const d = await res.json(); setError(d.error ?? 'Failed') }
   }
 
@@ -106,7 +109,7 @@ function JobsContent() {
         </div>
       </div>
 
-      {/* Add form */}
+      {/* Add job form */}
       {showForm && (
         <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
           <h2 className="text-base font-semibold mb-4">Add Job</h2>
@@ -190,61 +193,69 @@ function JobsContent() {
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
-          {filtered.length} of {jobs.length} jobs
-          {hasDateFilter && <span className="ml-2 text-blue-600 font-medium">· filtered by payment date</span>}
+        <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between text-xs text-gray-500">
+          <span>
+            {filtered.length} payment{filtered.length !== 1 ? 's' : ''}
+            {hasDateFilter && <span className="ml-2 text-blue-600 font-medium">· filtered by payment date</span>}
+          </span>
+          {filtered.length > 0 && (
+            <span className="font-mono font-semibold text-gray-700">{dollars(filteredTotal)}</span>
+          )}
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed text-sm">
+          <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <Th w="w-[8%]">Job #</Th>
-                <Th w="w-[18%]">Job Name</Th>
-                <Th w="w-[16%]">Company</Th>
-                <Th w="w-[10%]">Status</Th>
-                <Th w="w-[12%]">Last Payment</Th>
-                <Th w="w-[10%]">Days Since</Th>
-                <Th w="w-[13%]">Amount Received</Th>
-                <Th w="w-[10%]">Next Due</Th>
-                <Th w="w-[3%]"></Th>
+                <Th>Job #</Th>
+                <Th>Job Name</Th>
+                <Th>Company</Th>
+                <Th>Status</Th>
+                <Th>Date Received</Th>
+                <Th>Amount</Th>
+                <Th>Paid Thru</Th>
+                <Th></Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">No jobs found.</td></tr>
-              ) : filtered.map(job => {
-                const latest = job.payments[0]
-                const days = latest ? daysSince(latest.datePmtReceived) : null
-                return (
-                  <tr key={job.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => window.location.href = `/jobs/${job.id}`}>
-                    <td className="px-4 py-3 font-mono text-xs font-medium">{job.jobNumber}</td>
-                    <td className="px-4 py-3 truncate">
-                      <div className="text-gray-800 truncate">{job.jobName}</div>
-                      {job.customer && <div className="text-xs text-gray-400 truncate">{job.customer}</div>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-xs text-gray-600 truncate">{job.company}</div>
-                      <div className="text-xs text-gray-400">{job.division}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={job.jobStatus} />
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{latest ? fmtDate(latest.datePmtReceived) : '—'}</td>
-                    <td className={`px-4 py-3 text-xs font-mono ${days != null && days > 90 ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                      {days != null ? days : '—'}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-sm">{latest ? dollars(latest.amountReceived) : '—'}</td>
-                    <td className="px-4 py-3 font-mono text-sm text-gray-500">{job.nextAmountDue ? dollars(job.nextAmountDue) : '—'}</td>
-                    <td className="px-4 py-3 text-right">
-                      {job._count.projections > 0 && (
-                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{job._count.projections} proj</span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No payments found.</td></tr>
+              ) : filtered.map(p => (
+                <tr
+                  key={p.id}
+                  className="hover:bg-slate-50 cursor-pointer"
+                  onClick={() => window.location.href = `/jobs/${p.job.id}`}
+                >
+                  <td className="px-4 py-3 font-mono text-xs font-medium whitespace-nowrap">{p.job.jobNumber}</td>
+                  <td className="px-4 py-3">
+                    <div className="text-gray-800">{p.job.jobName}</div>
+                    {p.job.customer && <div className="text-xs text-gray-400">{p.job.customer}</div>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="text-xs text-gray-600">{p.job.company}</div>
+                    <div className="text-xs text-gray-400">{p.job.division}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={p.job.jobStatus} />
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDate(p.datePmtReceived)}</td>
+                  <td className="px-4 py-3 font-mono font-medium whitespace-nowrap">{dollars(p.amountReceived)}</td>
+                  <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{p.paidThruDate ? fmtDate(p.paidThruDate) : '—'}</td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    {p.job._count.projections > 0 && (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mr-2">{p.job._count.projections} proj</span>
+                    )}
+                    <Link
+                      href={`/jobs/${p.job.id}`}
+                      onClick={e => e.stopPropagation()}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      View →
+                    </Link>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -263,8 +274,8 @@ export default function JobsPage() {
 
 function StatusBadge({ status }: { status: string }) {
   return status === 'IN_PROGRESS'
-    ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">In Progress</span>
-    : <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Closed</span>
+    ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full whitespace-nowrap">In Progress</span>
+    : <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full whitespace-nowrap">Closed</span>
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -276,9 +287,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function Th({ children, w }: { children?: React.ReactNode; w?: string }) {
+function Th({ children }: { children?: React.ReactNode }) {
   return (
-    <th className={`px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left ${w ?? ''}`}>
+    <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left whitespace-nowrap">
       {children}
     </th>
   )
