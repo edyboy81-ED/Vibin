@@ -31,6 +31,10 @@ export default function ProjectionDetailPage() {
   const [showMoveModal, setShowMoveModal] = useState(false)
   const [moveForm, setMoveForm] = useState({ toDate: '', reason: '' })
   const [moving, setMoving] = useState(false)
+  const [showPaymentPanel, setShowPaymentPanel] = useState(false)
+  const [paymentForm, setPaymentForm] = useState({ date: '', amount: '' })
+  const [posting, setPosting] = useState(false)
+  const [postError, setPostError] = useState('')
 
   const fetch_ = useCallback(async () => {
     const [pRes, sRes] = await Promise.all([
@@ -43,6 +47,19 @@ export default function ProjectionDetailPage() {
   }, [id])
 
   useEffect(() => { fetch_() }, [fetch_])
+
+  useEffect(() => {
+    if (proj) {
+      const today = new Date()
+      const todayStr = today.getFullYear() + '-' +
+        String(today.getMonth() + 1).padStart(2, '0') + '-' +
+        String(today.getDate()).padStart(2, '0')
+      setPaymentForm({
+        date: todayStr,
+        amount: (proj.estimatedAmountOwed / 100).toFixed(2),
+      })
+    }
+  }, [proj])
 
   useEffect(() => {
     if (proj) setEditForm({
@@ -99,6 +116,27 @@ export default function ProjectionDetailPage() {
     fetch_()
   }
 
+  const handlePostPayment = async () => {
+    setPosting(true)
+    setPostError('')
+    const res = await fetch(`/api/projections/${id}/post-payment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        datePmtReceived: paymentForm.date,
+        amountReceived: Math.round(parseFloat(paymentForm.amount) * 100),
+      }),
+    })
+    if (res.ok) {
+      setShowPaymentPanel(false)
+      fetch_()
+    } else {
+      const d = await res.json()
+      setPostError(d.error ?? 'Failed to post payment')
+    }
+    setPosting(false)
+  }
+
   const handleDelete = async () => {
     if (!confirm('Delete this projection?')) return
     await fetch(`/api/projections/${id}`, { method: 'DELETE' })
@@ -140,6 +178,12 @@ export default function ProjectionDetailPage() {
             )}
             {!editing ? (
               <>
+                <button
+                  onClick={() => { setShowPaymentPanel(p => !p); setPostError('') }}
+                  className="text-sm bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700"
+                >
+                  Post Payment
+                </button>
                 <button onClick={() => setEditing(true)} className="text-sm text-gray-500 px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50">Edit</button>
                 <button onClick={() => setShowMoveModal(true)} className="text-sm bg-orange-50 text-orange-600 px-3 py-1.5 border border-orange-200 rounded-lg hover:bg-orange-100">Move Date</button>
                 <button onClick={handleDelete} className="text-sm text-red-500 px-3 py-1.5 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
@@ -188,6 +232,52 @@ export default function ProjectionDetailPage() {
           </dl>
         )}
       </div>
+
+      {/* Post payment panel */}
+      {showPaymentPanel && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-5 mb-4">
+          <h3 className="font-semibold text-green-900 mb-1">Post Payment</h3>
+          <p className="text-xs text-green-700 mb-4">
+            Creates a cash receipt on <span className="font-medium">{proj.jobNumber} — {proj.jobName}</span> and marks this projection as Received.
+          </p>
+          <div className="flex flex-wrap gap-4 items-end">
+            <Field label="Date Received">
+              <input
+                type="date"
+                value={paymentForm.date}
+                onChange={e => setPaymentForm(f => ({ ...f, date: e.target.value }))}
+                className="input w-44"
+              />
+            </Field>
+            <Field label="Amount Received ($)">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={paymentForm.amount}
+                onChange={e => setPaymentForm(f => ({ ...f, amount: e.target.value }))}
+                className="input w-44"
+              />
+            </Field>
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={handlePostPayment}
+                disabled={posting || !paymentForm.date || !paymentForm.amount}
+                className="bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+              >
+                {posting ? 'Posting…' : 'Confirm Payment'}
+              </button>
+              <button
+                onClick={() => { setShowPaymentPanel(false); setPostError('') }}
+                className="text-sm text-gray-500 px-4 py-2"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+          {postError && <p className="text-xs text-red-600 mt-3">{postError}</p>}
+        </div>
+      )}
 
       {/* Communication log */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-4">
