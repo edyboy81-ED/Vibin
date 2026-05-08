@@ -55,12 +55,14 @@ function ProjectionsContent() {
     const q = search.toLowerCase()
     const from = filterDateFrom ? new Date(filterDateFrom) : null
     const to = filterDateTo ? new Date(filterDateTo + 'T23:59:59') : null
+    const excludeStatus = searchParams.get('excludeStatus')?.toLowerCase() ?? null
     return projections.filter(p => {
       if (!showInactive && !p.isActive) return false
       if (q && !p.jobNumber.toLowerCase().includes(q) && !p.jobName.toLowerCase().includes(q)) return false
       if (filterDivision && p.division !== filterDivision) return false
       if (filterStatus && p.status.id !== filterStatus) return false
       if (filterCompany && p.company !== filterCompany) return false
+      if (excludeStatus && p.status.name.toLowerCase() === excludeStatus) return false
       if (from || to) {
         const d = new Date(p.estimatedPaymentDate)
         if (from && d < from) return false
@@ -68,7 +70,7 @@ function ProjectionsContent() {
       }
       return true
     })
-  }, [projections, search, filterDivision, filterStatus, filterCompany, showInactive, filterDateFrom, filterDateTo])
+  }, [projections, search, filterDivision, filterStatus, filterCompany, showInactive, filterDateFrom, filterDateTo, searchParams])
 
   // Group by payment date
   const grouped = useMemo(() => {
