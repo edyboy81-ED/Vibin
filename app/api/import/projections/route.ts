@@ -80,6 +80,10 @@ function formatDate(dt: Date): string {
   return `${dt.getUTCMonth() + 1}/${dt.getUTCDate()}/${dt.getUTCFullYear()}`
 }
 
+function isExcelDateCorrupted(jobNumber: string): boolean {
+  return /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d+$/i.test(jobNumber)
+}
+
 function parseMoney(s: string): number | null {
   if (!s || s === '—') return null
   const clean = s.replace(/[$,\s]/g, '')
@@ -128,6 +132,7 @@ export async function POST(req: NextRequest) {
 
   const stats = { created: 0, updated: 0, skipped: 0, rowsSkipped: 0 }
   const errors: string[] = []
+  const excelDateWarnings: string[] = []
   const unmatched: object[] = []
 
   for (const [rowIndex, row] of rows.entries()) {
@@ -135,6 +140,12 @@ export async function POST(req: NextRequest) {
 
     const jobNumber = get('jobNumber').trim()
     if (!jobNumber) { stats.rowsSkipped++; continue }
+
+    if (isExcelDateCorrupted(jobNumber)) {
+      excelDateWarnings.push(`Row ${rowIndex + 2}: Job # "${jobNumber}" looks like an Excel date. Fix the Job # column format in Excel before importing.`)
+      stats.rowsSkipped++
+      continue
+    }
 
     const estimatedPaymentDate = parseDate(get('estimatedPaymentDate'))
     if (!estimatedPaymentDate) {
@@ -249,5 +260,5 @@ export async function POST(req: NextRequest) {
     stats.created++
   }
 
-  return NextResponse.json({ stats, errors, unmatched, totalRows: rows.length, detectedColumns: Object.keys(colMap) })
+  return NextResponse.json({ stats, errors, excelDateWarnings, unmatched, totalRows: rows.length, detectedColumns: Object.keys(colMap) })
 }

@@ -22,6 +22,7 @@ interface UnmatchedRow {
 
 interface ImportResult {
   stats: { created: number; updated: number; skipped: number; rowsSkipped: number }
+  excelDateWarnings: string[]
   errors: string[]
   unmatched: UnmatchedRow[]
   totalRows: number
@@ -241,6 +242,14 @@ export default function ImportProjectionsPage() {
               <StatCard label="Rows Skipped" value={result.stats.rowsSkipped} color="text-gray-500" note="missing data" />
               <StatCard label="Jobs Not Found" value={result.unmatched?.length ?? 0} color={result.unmatched?.length ? 'text-orange-600' : 'text-gray-500'} note="see below" />
             </div>
+
+            {result.excelDateWarnings?.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                <p className="text-sm font-medium text-red-800 mb-1">⚠️ Excel date formatting detected — these rows were skipped:</p>
+                {result.excelDateWarnings.map((w, i) => <p key={i} className="text-xs text-red-700">{w}</p>)}
+                <p className="text-xs text-red-600 mt-2 font-medium">Fix: In Excel, select the Job # column → right-click → Format Cells → Text → re-enter the job numbers → re-export as CSV.</p>
+              </div>
+            )}
 
             {result.errors.length > 0 && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">

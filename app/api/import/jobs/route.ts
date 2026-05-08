@@ -100,6 +100,10 @@ function parseJobStatus(s: string): 'IN_PROGRESS' | 'CLOSED' {
   return 'IN_PROGRESS'
 }
 
+function isExcelDateCorrupted(jobNumber: string): boolean {
+  return /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d+$/i.test(jobNumber)
+}
+
 // ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
@@ -125,12 +129,19 @@ export async function POST(req: NextRequest) {
 
   const stats = { jobsCreated: 0, jobsUpdated: 0, paymentsCreated: 0, paymentsSkipped: 0, rowsSkipped: 0 }
   const errors: string[] = []
+  const excelDateWarnings: string[] = []
 
   for (const [rowIndex, row] of rows.entries()) {
     const get = (field: string) => colMap[field] ? row[colMap[field]] ?? '' : ''
 
     const jobNumber = get('jobNumber').trim()
     if (!jobNumber) { stats.rowsSkipped++; continue }
+
+    if (isExcelDateCorrupted(jobNumber)) {
+      excelDateWarnings.push(`Row ${rowIndex + 2}: Job # "${jobNumber}" looks like an Excel date. Fix the Job # column format in Excel before importing.`)
+      stats.rowsSkipped++
+      continue
+    }
 
     const jobName = get('jobName') || jobNumber
     const company = get('company') || 'Johnson Bros Corporation'
@@ -186,5 +197,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ stats, errors, totalRows: rows.length, detectedColumns: Object.keys(colMap) })
+  return NextResponse.json({ stats, errors, excelDateWarnings, totalRows: rows.length, detectedColumns: Object.keys(colMap) })
 }
