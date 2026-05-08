@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getDivision } from '@/lib/companies'
 
-// ---------------------------------------------------------------------------
-// CSV parsing
-// ---------------------------------------------------------------------------
-
 function parseCSVLine(line: string): string[] {
   const result: string[] = []
   let current = ''
@@ -37,10 +33,6 @@ function parseCSV(text: string): Record<string, string>[] {
   }).filter(row => Object.values(row).some(v => v !== ''))
 }
 
-// ---------------------------------------------------------------------------
-// Column resolution — handles our export format + common spreadsheet variants
-// ---------------------------------------------------------------------------
-
 const ALIASES: Record<string, string[]> = {
   jobNumber:        ['job', 'job #', 'job#', 'job number', 'jobnumber'],
   jobName:          ['job name', 'jobname', 'name'],
@@ -64,13 +56,8 @@ function resolveColumns(headers: string[]): Record<string, string> {
   return map
 }
 
-// ---------------------------------------------------------------------------
-// Value parsers
-// ---------------------------------------------------------------------------
-
 function parseDate(s: string): Date | null {
   if (!s || s === '—' || s.toLowerCase() === 'n/a') return null
-  // M/D/YYYY or M/D/YY
   const mdyMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/)
   if (mdyMatch) {
     const [, m, d, y] = mdyMatch
@@ -78,7 +65,6 @@ function parseDate(s: string): Date | null {
     const dt = new Date(year, parseInt(m) - 1, parseInt(d))
     return isNaN(dt.getTime()) ? null : dt
   }
-  // YYYY-MM-DD
   const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (isoMatch) {
     const dt = new Date(s)
@@ -100,14 +86,16 @@ function parseJobStatus(s: string): 'IN_PROGRESS' | 'CLOSED' {
   return 'IN_PROGRESS'
 }
 
-// ---------------------------------------------------------------------------
-// Route handler
-// ---------------------------------------------------------------------------
+function isExcelDateCorrupted(jobNumber: string): boolean {
+  return /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d+$/i.test(jobNumber)
+}
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData()
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
+
+  const corrections: Record<string, string> = JSON.parse(formData.get('corrections') as string || '{}')
 
   const text = await file.text()
   const rows = parseCSV(text)
@@ -123,14 +111,35 @@ export async function POST(req: NextRequest) {
     }, { status: 400 })
   }
 
+  // Scan for corrupted job numbers before doing any DB writes
+  const corruptedMap = new Map<string, { count: number; sampleJobName: string }>()
+  for (const row of rows) {
+    const jobNumber = (colMap.jobNumber ? row[colMap.jobNumber] ?? '' : '').trim()
+    if (!jobNumber || !isExcelDateCorrupted(jobNumber)) continue
+    if (corrections[jobNumber]) continue // already corrected
+    const existing = corruptedMap.get(jobNumber)
+    const sampleJobName = (colMap.jobName ? row[colMap.jobName] ?? '' : '').trim() || jobNumber
+    corruptedMap.set(jobNumber, { count: (existing?.count ?? 0) + 1, sampleJobName: existing?.sampleJobName ?? sampleJobName })
+  }
+
+  if (corruptedMap.size > 0) {
+    return NextResponse.json({
+      needsCorrection: true,
+      corruptedValues: Array.from(corruptedMap.entries()).map(([value, { count, sampleJobName }]) => ({ value, count, sampleJobName })),
+    })
+  }
+
   const stats = { jobsCreated: 0, jobsUpdated: 0, paymentsCreated: 0, paymentsSkipped: 0, rowsSkipped: 0 }
   const errors: string[] = []
 
   for (const [rowIndex, row] of rows.entries()) {
     const get = (field: string) => colMap[field] ? row[colMap[field]] ?? '' : ''
 
-    const jobNumber = get('jobNumber').trim()
+    let jobNumber = get('jobNumber').trim()
     if (!jobNumber) { stats.rowsSkipped++; continue }
+
+    // Apply user-provided corrections
+    if (corrections[jobNumber]) jobNumber = corrections[jobNumber].trim()
 
     const jobName = get('jobName') || jobNumber
     const company = get('company') || 'Johnson Bros Corporation'
@@ -142,7 +151,6 @@ export async function POST(req: NextRequest) {
     const nextAmountDue = parseMoney(get('nextAmountDue'))
     const notes = get('notes') || null
 
-    // Upsert job
     try {
       const existing = await prisma.job.findUnique({ where: { jobNumber } })
       if (existing) {
@@ -157,20 +165,18 @@ export async function POST(req: NextRequest) {
         })
         stats.jobsCreated++
       }
-    } catch (e) {
+    } catch {
       errors.push(`Row ${rowIndex + 2}: Failed to upsert job ${jobNumber}`)
       stats.rowsSkipped++
       continue
     }
 
-    // Create payment if data present
     const datePmtReceived = parseDate(get('datePmtReceived'))
     const amountReceived = parseMoney(get('amountReceived'))
 
     if (datePmtReceived && amountReceived != null && amountReceived > 0) {
       const job = await prisma.job.findUnique({ where: { jobNumber } })
       if (job) {
-        // Check for duplicate (same job + same date)
         const duplicate = await prisma.payment.findFirst({
           where: { jobId: job.id, datePmtReceived },
         })

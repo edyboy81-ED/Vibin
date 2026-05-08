@@ -49,11 +49,11 @@ export default async function DashboardPage() {
       select: { status: { select: { name: true } } },
     }),
     prisma.projectedPayment.findMany({
-      where: { isActive: true, estimatedPaymentDate: { gte: nextWeekMon, lte: nextWeekFriEnd } },
+      where: { isActive: true, estimatedPaymentDate: { gte: nextWeekMon, lte: nextWeekFriEnd }, NOT: [{ status: { name: { equals: 'received', mode: 'insensitive' } } }] },
       select: { estimatedAmountOwed: true },
     }),
     prisma.projectedPayment.findMany({
-      where: { isActive: true, estimatedPaymentDate: { gt: nextWeekFriEnd } },
+      where: { isActive: true, estimatedPaymentDate: { gt: nextWeekFriEnd }, NOT: [{ status: { name: { equals: 'received', mode: 'insensitive' } } }] },
       select: { estimatedAmountOwed: true },
     }),
   ])
@@ -95,8 +95,8 @@ export default async function DashboardPage() {
       {/* Projections */}
       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Projected Payments</h2>
       <div className="grid grid-cols-4 gap-4 mb-8">
-        <StatCard label="Next Week" value={dollars(nextWeekTotal)} sub={`${nextWeekProjections.length} projections`} color="yellow" href={`/projections?dateFrom=${nextWeekMonStr}&dateTo=${nextWeekFriStr}`} />
-        <StatCard label="Future" value={dollars(futureTotal)} sub={`${futureProjections.length} projections`} color="gray" href={`/projections?dateFrom=${afterNextWeekFriStr}`} />
+        <StatCard label="Next Week" value={dollars(nextWeekTotal)} sub={`${nextWeekProjections.length} projections`} color="yellow" href={`/projections?dateFrom=${nextWeekMonStr}&dateTo=${nextWeekFriStr}&excludeStatus=received`} />
+        <StatCard label="Future" value={dollars(futureTotal)} sub={`${futureProjections.length} projections`} color="gray" href={`/projections?dateFrom=${afterNextWeekFriStr}&excludeStatus=received`} />
         <StatCard label="Projected" value={projectedCount.toString()} sub="awaiting payment" color="blue" href="/projections?statusName=Projected" />
         <StatCard label="Partial" value={partialCount.toString()} sub="partially received" color="orange" href="/projections?statusName=Partial" />
       </div>

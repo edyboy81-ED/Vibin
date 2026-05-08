@@ -20,8 +20,14 @@ interface UnmatchedRow {
   notes: string | null
 }
 
+interface CorruptedValue {
+  value: string
+  count: number
+  sampleJobName: string
+}
+
 interface ImportResult {
-  stats: { created: number; skipped: number; rowsSkipped: number }
+  stats: { created: number; updated: number; skipped: number; rowsSkipped: number }
   errors: string[]
   unmatched: UnmatchedRow[]
   totalRows: number
@@ -49,6 +55,8 @@ export default function ImportProjectionsPage() {
   const [editableRows, setEditableRows] = useState<EditableRow[]>([])
   const [creating, setCreating] = useState(false)
   const [createResult, setCreateResult] = useState<CreateJobsResult | null>(null)
+  const [corruptedValues, setCorruptedValues] = useState<CorruptedValue[] | null>(null)
+  const [corrections, setCorrections] = useState<Record<string, string>>({})
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleFile = (f: File) => {
@@ -58,6 +66,8 @@ export default function ImportProjectionsPage() {
     setError('')
     setEditableRows([])
     setCreateResult(null)
+    setCorruptedValues(null)
+    setCorrections({})
   }
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -67,7 +77,7 @@ export default function ImportProjectionsPage() {
     if (f) handleFile(f)
   }, [])
 
-  const handleImport = async () => {
+  const submitImport = async (withCorrections: Record<string, string> = {}) => {
     if (!file) return
     setUploading(true)
     setError('')
@@ -77,6 +87,7 @@ export default function ImportProjectionsPage() {
 
     const formData = new FormData()
     formData.append('file', file)
+    formData.append('corrections', JSON.stringify(withCorrections))
 
     const res = await fetch('/api/import/projections', { method: 'POST', body: formData })
     const data = await res.json()
@@ -84,17 +95,39 @@ export default function ImportProjectionsPage() {
 
     if (!res.ok) {
       setError(data.error ?? 'Import failed')
-    } else {
-      setResult(data)
-      if (data.unmatched?.length) {
-        setEditableRows(data.unmatched.map((r: UnmatchedRow) => ({
-          ...r,
-          selected: true,
-          editJobName: r.jobName,
-          editCompany: r.company || 'Johnson Bros Corporation',
-        })))
-      }
+      return
     }
+
+    if (data.needsCorrection) {
+      setCorruptedValues(data.corruptedValues)
+      const initial: Record<string, string> = {}
+      data.corruptedValues.forEach((cv: CorruptedValue) => { initial[cv.value] = '' })
+      setCorrections(initial)
+      return
+    }
+
+    setCorruptedValues(null)
+    setResult(data)
+    if (data.unmatched?.length) {
+      setEditableRows(data.unmatched.map((r: UnmatchedRow) => ({
+        ...r,
+        selected: true,
+        editJobName: r.jobName,
+        editCompany: r.company || 'Johnson Bros Corporation',
+      })))
+    }
+  }
+
+  const handleImport = () => submitImport()
+
+  const handleConfirmCorrections = () => {
+    const missing = corruptedValues?.filter(cv => !corrections[cv.value]?.trim())
+    if (missing?.length) {
+      setError('Please fill in a corrected job number for every row before importing.')
+      return
+    }
+    setError('')
+    submitImport(corrections)
   }
 
   const updateRow = (index: number, patch: Partial<EditableRow>) => {
@@ -139,6 +172,8 @@ export default function ImportProjectionsPage() {
     setError('')
     setEditableRows([])
     setCreateResult(null)
+    setCorruptedValues(null)
+    setCorrections({})
     if (inputRef.current) inputRef.current.value = ''
   }
 
@@ -174,10 +209,66 @@ export default function ImportProjectionsPage() {
             <span><span className="font-mono text-gray-700">Status</span> — defaults to Projected</span>
             <span><span className="font-mono text-gray-700">Notes</span></span>
           </div>
-          <p className="text-gray-400 mt-2">Duplicate rows (same job + estimate # + date) are skipped automatically.</p>
+          <p className="text-gray-400 mt-2">Existing projections (same job + estimate #) are updated automatically. New ones are created.</p>
         </div>
 
-        {!result && (
+        {/* Correction step */}
+        {corruptedValues && !result && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-orange-500 text-lg">⚠️</span>
+              <span className="font-semibold text-gray-900">Excel formatted some job numbers as dates</span>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              The import is paused. Enter the correct job number for each row below, then click <strong>Confirm &amp; Import</strong>.
+            </p>
+            <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-4 py-2 text-xs text-gray-500 font-medium">Excel value</th>
+                    <th className="text-left px-4 py-2 text-xs text-gray-500 font-medium">Job name (sample)</th>
+                    <th className="text-left px-4 py-2 text-xs text-gray-500 font-medium">Rows affected</th>
+                    <th className="text-left px-4 py-2 text-xs text-gray-500 font-medium">Correct job #</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {corruptedValues.map(cv => (
+                    <tr key={cv.value} className="bg-white">
+                      <td className="px-4 py-3 font-mono text-red-600">{cv.value}</td>
+                      <td className="px-4 py-3 text-gray-600 text-xs">{cv.sampleJobName}</td>
+                      <td className="px-4 py-3 text-gray-400 text-xs">{cv.count}</td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="text"
+                          placeholder="e.g. 10-2369"
+                          value={corrections[cv.value] ?? ''}
+                          onChange={e => setCorrections(prev => ({ ...prev, [cv.value]: e.target.value }))}
+                          className="border border-gray-300 rounded px-2 py-1 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirmCorrections}
+                disabled={uploading}
+                className="bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
+              >
+                {uploading ? 'Importing…' : 'Confirm & Import'}
+              </button>
+              <button onClick={reset} className="text-sm text-gray-500 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!result && !corruptedValues && (
           <>
             <div
               onDragOver={e => { e.preventDefault(); setDragging(true) }}
@@ -236,7 +327,8 @@ export default function ImportProjectionsPage() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               <StatCard label="Projections Created" value={result.stats.created} color="text-green-700" />
-              <StatCard label="Duplicates Skipped" value={result.stats.skipped} color="text-gray-500" note="already existed" />
+              <StatCard label="Projections Updated" value={result.stats.updated} color="text-blue-700" />
+              <StatCard label="No Changes" value={result.stats.skipped} color="text-gray-500" note="already up to date" />
               <StatCard label="Rows Skipped" value={result.stats.rowsSkipped} color="text-gray-500" note="missing data" />
               <StatCard label="Jobs Not Found" value={result.unmatched?.length ?? 0} color={result.unmatched?.length ? 'text-orange-600' : 'text-gray-500'} note="see below" />
             </div>

@@ -60,15 +60,28 @@ function parseDate(s: string): Date | null {
   if (mdyMatch) {
     const [, m, d, y] = mdyMatch
     const year = y.length === 2 ? 2000 + parseInt(y) : parseInt(y)
-    const dt = new Date(year, parseInt(m) - 1, parseInt(d))
+    const dt = new Date(Date.UTC(year, parseInt(m) - 1, parseInt(d)))
     return isNaN(dt.getTime()) ? null : dt
   }
   const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (isoMatch) {
-    const dt = new Date(s)
+    const [, y, m, d] = isoMatch
+    const dt = new Date(Date.UTC(parseInt(y), parseInt(m) - 1, parseInt(d)))
     return isNaN(dt.getTime()) ? null : dt
   }
   return null
+}
+
+function formatMoney(cents: number): string {
+  return '$' + (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function formatDate(dt: Date): string {
+  return `${dt.getUTCMonth() + 1}/${dt.getUTCDate()}/${dt.getUTCFullYear()}`
+}
+
+function isExcelDateCorrupted(jobNumber: string): boolean {
+  return /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d+$/i.test(jobNumber)
 }
 
 function parseMoney(s: string): number | null {
@@ -82,6 +95,8 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData()
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
+
+  const corrections: Record<string, string> = JSON.parse(formData.get('corrections') as string || '{}')
 
   const text = await file.text()
   const rows = parseCSV(text)
@@ -109,6 +124,24 @@ export async function POST(req: NextRequest) {
     }, { status: 400 })
   }
 
+  // Scan for corrupted job numbers before doing any DB writes
+  const corruptedMap = new Map<string, { count: number; sampleJobName: string }>()
+  for (const row of rows) {
+    const jobNumber = (colMap.jobNumber ? row[colMap.jobNumber] ?? '' : '').trim()
+    if (!jobNumber || !isExcelDateCorrupted(jobNumber)) continue
+    if (corrections[jobNumber]) continue
+    const existing = corruptedMap.get(jobNumber)
+    const sampleJobName = (colMap.jobName ? row[colMap.jobName] ?? '' : '').trim() || jobNumber
+    corruptedMap.set(jobNumber, { count: (existing?.count ?? 0) + 1, sampleJobName: existing?.sampleJobName ?? sampleJobName })
+  }
+
+  if (corruptedMap.size > 0) {
+    return NextResponse.json({
+      needsCorrection: true,
+      corruptedValues: Array.from(corruptedMap.entries()).map(([value, { count, sampleJobName }]) => ({ value, count, sampleJobName })),
+    })
+  }
+
   const [allJobs, allStatuses] = await Promise.all([
     prisma.job.findMany({ select: { id: true, jobNumber: true, jobName: true, company: true, division: true } }),
     prisma.projectionStatus.findMany(),
@@ -117,15 +150,18 @@ export async function POST(req: NextRequest) {
   const statusMap = new Map(allStatuses.map(s => [s.name.toLowerCase(), s]))
   const defaultStatus = statusMap.get('projected') ?? allStatuses[0]
 
-  const stats = { created: 0, skipped: 0, rowsSkipped: 0 }
+  const stats = { created: 0, updated: 0, skipped: 0, rowsSkipped: 0 }
   const errors: string[] = []
   const unmatched: object[] = []
 
   for (const [rowIndex, row] of rows.entries()) {
     const get = (field: string) => colMap[field] ? row[colMap[field]] ?? '' : ''
 
-    const jobNumber = get('jobNumber').trim()
+    let jobNumber = get('jobNumber').trim()
     if (!jobNumber) { stats.rowsSkipped++; continue }
+
+    // Apply user-provided corrections
+    if (corrections[jobNumber]) jobNumber = corrections[jobNumber].trim()
 
     const estimatedPaymentDate = parseDate(get('estimatedPaymentDate'))
     if (!estimatedPaymentDate) {
@@ -176,11 +212,49 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    // Check for duplicate
-    const duplicate = await prisma.projectedPayment.findFirst({
-      where: { jobId: job.id, estimateNumber, estimatedPaymentDate },
+    const existing = await prisma.projectedPayment.findFirst({
+      where: { jobId: job.id, estimateNumber },
+      include: { notes: { orderBy: { createdAt: 'desc' }, take: 1 } },
     })
-    if (duplicate) { stats.skipped++; continue }
+
+    if (existing) {
+      const updateData: Record<string, unknown> = {}
+      const noteLines: string[] = []
+
+      const existingDateStr = existing.estimatedPaymentDate.toISOString().split('T')[0]
+      const csvDateStr = estimatedPaymentDate.toISOString().split('T')[0]
+      if (existingDateStr !== csvDateStr) {
+        updateData.estimatedPaymentDate = estimatedPaymentDate
+        noteLines.push(`Import update: Payment date changed from ${formatDate(existing.estimatedPaymentDate)} to ${formatDate(estimatedPaymentDate)}`)
+      }
+
+      if (existing.estimatedAmountOwed !== estimatedAmountOwed) {
+        updateData.estimatedAmountOwed = estimatedAmountOwed
+        noteLines.push(`Import update: Amount changed from ${formatMoney(existing.estimatedAmountOwed)} to ${formatMoney(estimatedAmountOwed)}`)
+      }
+
+      if (billingPeriod !== '—' && existing.billingPeriod !== billingPeriod) {
+        updateData.billingPeriod = billingPeriod
+      }
+
+      if (notes) {
+        noteLines.push(notes)
+      }
+
+      if (Object.keys(updateData).length > 0 || noteLines.length > 0) {
+        await prisma.projectedPayment.update({
+          where: { id: existing.id },
+          data: {
+            ...updateData,
+            ...(noteLines.length > 0 ? { notes: { create: [{ content: noteLines.join('\n') }] } } : {}),
+          },
+        })
+        stats.updated++
+      } else {
+        stats.skipped++
+      }
+      continue
+    }
 
     await prisma.projectedPayment.create({
       data: {
