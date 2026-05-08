@@ -101,7 +101,7 @@ export async function buildReport(reportDate: Date): Promise<ReportData> {
 
   // --- Projections: next week ---
   const nextWeekProjections = await prisma.projectedPayment.findMany({
-    where: { estimatedPaymentDate: { gte: nextWeekStart, lte: nextWeekEnd }, isActive: true },
+    where: { estimatedPaymentDate: { gte: nextWeekStart, lte: nextWeekEnd }, isActive: true, NOT: [{ status: { name: { equals: 'received', mode: 'insensitive' } } }] },
     include: {
       status: true,
       notes: { orderBy: { createdAt: 'desc' }, take: 1 },
@@ -111,7 +111,7 @@ export async function buildReport(reportDate: Date): Promise<ReportData> {
 
   // --- Projections: future ---
   const futureProjections = await prisma.projectedPayment.findMany({
-    where: { estimatedPaymentDate: { gte: futureStart }, isActive: true },
+    where: { estimatedPaymentDate: { gte: futureStart }, isActive: true, NOT: [{ status: { name: { equals: 'received', mode: 'insensitive' } } }] },
     include: {
       status: true,
       notes: { orderBy: { createdAt: 'desc' }, take: 1 },

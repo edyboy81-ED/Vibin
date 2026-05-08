@@ -49,11 +49,11 @@ export default async function DashboardPage() {
       select: { status: { select: { name: true } } },
     }),
     prisma.projectedPayment.findMany({
-      where: { isActive: true, estimatedPaymentDate: { gte: nextWeekMon, lte: nextWeekFriEnd } },
+      where: { isActive: true, estimatedPaymentDate: { gte: nextWeekMon, lte: nextWeekFriEnd }, NOT: [{ status: { name: { equals: 'received', mode: 'insensitive' } } }] },
       select: { estimatedAmountOwed: true },
     }),
     prisma.projectedPayment.findMany({
-      where: { isActive: true, estimatedPaymentDate: { gt: nextWeekFriEnd } },
+      where: { isActive: true, estimatedPaymentDate: { gt: nextWeekFriEnd }, NOT: [{ status: { name: { equals: 'received', mode: 'insensitive' } } }] },
       select: { estimatedAmountOwed: true },
     }),
   ])
