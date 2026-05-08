@@ -96,6 +96,8 @@ export async function POST(req: NextRequest) {
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
 
+  const corrections: Record<string, string> = JSON.parse(formData.get('corrections') as string || '{}')
+
   const text = await file.text()
   const rows = parseCSV(text)
   if (rows.length === 0) return NextResponse.json({ error: 'CSV is empty or unreadable' }, { status: 400 })
@@ -122,6 +124,24 @@ export async function POST(req: NextRequest) {
     }, { status: 400 })
   }
 
+  // Scan for corrupted job numbers before doing any DB writes
+  const corruptedMap = new Map<string, { count: number; sampleJobName: string }>()
+  for (const row of rows) {
+    const jobNumber = (colMap.jobNumber ? row[colMap.jobNumber] ?? '' : '').trim()
+    if (!jobNumber || !isExcelDateCorrupted(jobNumber)) continue
+    if (corrections[jobNumber]) continue
+    const existing = corruptedMap.get(jobNumber)
+    const sampleJobName = (colMap.jobName ? row[colMap.jobName] ?? '' : '').trim() || jobNumber
+    corruptedMap.set(jobNumber, { count: (existing?.count ?? 0) + 1, sampleJobName: existing?.sampleJobName ?? sampleJobName })
+  }
+
+  if (corruptedMap.size > 0) {
+    return NextResponse.json({
+      needsCorrection: true,
+      corruptedValues: Array.from(corruptedMap.entries()).map(([value, { count, sampleJobName }]) => ({ value, count, sampleJobName })),
+    })
+  }
+
   const [allJobs, allStatuses] = await Promise.all([
     prisma.job.findMany({ select: { id: true, jobNumber: true, jobName: true, company: true, division: true } }),
     prisma.projectionStatus.findMany(),
@@ -132,20 +152,16 @@ export async function POST(req: NextRequest) {
 
   const stats = { created: 0, updated: 0, skipped: 0, rowsSkipped: 0 }
   const errors: string[] = []
-  const excelDateWarnings: string[] = []
   const unmatched: object[] = []
 
   for (const [rowIndex, row] of rows.entries()) {
     const get = (field: string) => colMap[field] ? row[colMap[field]] ?? '' : ''
 
-    const jobNumber = get('jobNumber').trim()
+    let jobNumber = get('jobNumber').trim()
     if (!jobNumber) { stats.rowsSkipped++; continue }
 
-    if (isExcelDateCorrupted(jobNumber)) {
-      excelDateWarnings.push(`Row ${rowIndex + 2}: Job # "${jobNumber}" looks like an Excel date. Fix the Job # column format in Excel before importing.`)
-      stats.rowsSkipped++
-      continue
-    }
+    // Apply user-provided corrections
+    if (corrections[jobNumber]) jobNumber = corrections[jobNumber].trim()
 
     const estimatedPaymentDate = parseDate(get('estimatedPaymentDate'))
     if (!estimatedPaymentDate) {
@@ -260,5 +276,5 @@ export async function POST(req: NextRequest) {
     stats.created++
   }
 
-  return NextResponse.json({ stats, errors, excelDateWarnings, unmatched, totalRows: rows.length, detectedColumns: Object.keys(colMap) })
+  return NextResponse.json({ stats, errors, unmatched, totalRows: rows.length, detectedColumns: Object.keys(colMap) })
 }

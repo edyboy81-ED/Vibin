@@ -3,10 +3,15 @@
 import { useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 
+interface CorruptedValue {
+  value: string
+  count: number
+  sampleJobName: string
+}
+
 interface ImportResult {
   stats: { jobsCreated: number; jobsUpdated: number; paymentsCreated: number; paymentsSkipped: number; rowsSkipped: number }
   errors: string[]
-  excelDateWarnings: string[]
   totalRows: number
   detectedColumns: string[]
 }
@@ -17,12 +22,16 @@ export default function ImportPage() {
   const [uploading, setUploading] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState('')
+  const [corruptedValues, setCorruptedValues] = useState<CorruptedValue[] | null>(null)
+  const [corrections, setCorrections] = useState<Record<string, string>>({})
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleFile = (f: File) => {
     if (!f.name.endsWith('.csv')) { setError('Please select a .csv file.'); return }
     setFile(f)
     setResult(null)
+    setCorruptedValues(null)
+    setCorrections({})
     setError('')
   }
 
@@ -33,14 +42,14 @@ export default function ImportPage() {
     if (f) handleFile(f)
   }, [])
 
-  const handleImport = async () => {
+  const submitImport = async (withCorrections: Record<string, string> = {}) => {
     if (!file) return
     setUploading(true)
     setError('')
-    setResult(null)
 
     const formData = new FormData()
     formData.append('file', file)
+    formData.append('corrections', JSON.stringify(withCorrections))
 
     const res = await fetch('/api/import/jobs', { method: 'POST', body: formData })
     const data = await res.json()
@@ -48,17 +57,38 @@ export default function ImportPage() {
 
     if (!res.ok) {
       setError(data.error ?? 'Import failed')
-      if (data.detectedColumns) {
-        setError(prev => prev + `\n\nDetected columns: ${data.detectedColumns.join(', ')}`)
-      }
-    } else {
-      setResult(data)
+      return
     }
+
+    if (data.needsCorrection) {
+      setCorruptedValues(data.corruptedValues)
+      const initial: Record<string, string> = {}
+      data.corruptedValues.forEach((cv: CorruptedValue) => { initial[cv.value] = '' })
+      setCorrections(initial)
+      return
+    }
+
+    setCorruptedValues(null)
+    setResult(data)
+  }
+
+  const handleImport = () => submitImport()
+
+  const handleConfirmCorrections = () => {
+    const missing = corruptedValues?.filter(cv => !corrections[cv.value]?.trim())
+    if (missing?.length) {
+      setError('Please fill in a corrected job number for every row before importing.')
+      return
+    }
+    setError('')
+    submitImport(corrections)
   }
 
   const reset = () => {
     setFile(null)
     setResult(null)
+    setCorruptedValues(null)
+    setCorrections({})
     setError('')
     if (inputRef.current) inputRef.current.value = ''
   }
@@ -98,7 +128,7 @@ export default function ImportPage() {
         </div>
 
         {/* Drop zone */}
-        {!result && (
+        {!result && !corruptedValues && (
           <>
             <div
               onDragOver={e => { e.preventDefault(); setDragging(true) }}
@@ -139,13 +169,74 @@ export default function ImportPage() {
                 disabled={!file || uploading}
                 className="bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
               >
-                {uploading ? 'Importing…' : 'Import'}
+                {uploading ? 'Scanning…' : 'Import'}
               </button>
               {file && (
                 <button onClick={reset} className="text-sm text-gray-500 px-4 py-2">Clear</button>
               )}
             </div>
           </>
+        )}
+
+        {/* Correction step */}
+        {corruptedValues && !result && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-orange-500 text-lg">⚠️</span>
+              <span className="font-semibold text-gray-900">Excel formatted some job numbers as dates</span>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              The import is paused. Enter the correct job number for each row below, then click <strong>Confirm &amp; Import</strong>.
+            </p>
+
+            <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-4 py-2 text-xs text-gray-500 font-medium">Excel value</th>
+                    <th className="text-left px-4 py-2 text-xs text-gray-500 font-medium">Job name (sample)</th>
+                    <th className="text-left px-4 py-2 text-xs text-gray-500 font-medium">Rows affected</th>
+                    <th className="text-left px-4 py-2 text-xs text-gray-500 font-medium">Correct job #</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {corruptedValues.map(cv => (
+                    <tr key={cv.value} className="bg-white">
+                      <td className="px-4 py-3 font-mono text-red-600">{cv.value}</td>
+                      <td className="px-4 py-3 text-gray-600 text-xs">{cv.sampleJobName}</td>
+                      <td className="px-4 py-3 text-gray-400 text-xs">{cv.count}</td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="text"
+                          placeholder="e.g. 10-2369"
+                          value={corrections[cv.value] ?? ''}
+                          onChange={e => setCorrections(prev => ({ ...prev, [cv.value]: e.target.value }))}
+                          className="border border-gray-300 rounded px-2 py-1 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {error && (
+              <p className="text-red-600 text-sm mb-3">{error}</p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirmCorrections}
+                disabled={uploading}
+                className="bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
+              >
+                {uploading ? 'Importing…' : 'Confirm & Import'}
+              </button>
+              <button onClick={reset} className="text-sm text-gray-500 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Results */}
@@ -168,14 +259,6 @@ export default function ImportPage() {
             <div className="text-xs text-gray-400 mb-4">
               Columns matched: {result.detectedColumns.join(', ')}
             </div>
-
-            {result.excelDateWarnings?.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                <p className="text-sm font-medium text-red-800 mb-1">⚠️ Excel date formatting detected — these rows were skipped:</p>
-                {result.excelDateWarnings.map((w, i) => <p key={i} className="text-xs text-red-700">{w}</p>)}
-                <p className="text-xs text-red-600 mt-2 font-medium">Fix: In Excel, select the Job # column → right-click → Format Cells → Text → re-enter the job numbers → re-export as CSV.</p>
-              </div>
-            )}
 
             {result.errors.length > 0 && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
@@ -205,6 +288,7 @@ export default function ImportPage() {
           <li>If your spreadsheet has multiple sheets, export the one with the job list</li>
           <li>Dollar amounts can include $ signs and commas — the importer handles them</li>
           <li>Dates in M/D/YYYY format are supported</li>
+          <li>To prevent job numbers from being reformatted as dates, open CSVs via Data → Get Data → From Text/CSV in Excel</li>
         </ol>
       </div>
     </div>
