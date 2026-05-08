@@ -60,15 +60,24 @@ function parseDate(s: string): Date | null {
   if (mdyMatch) {
     const [, m, d, y] = mdyMatch
     const year = y.length === 2 ? 2000 + parseInt(y) : parseInt(y)
-    const dt = new Date(year, parseInt(m) - 1, parseInt(d))
+    const dt = new Date(Date.UTC(year, parseInt(m) - 1, parseInt(d)))
     return isNaN(dt.getTime()) ? null : dt
   }
   const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (isoMatch) {
-    const dt = new Date(s)
+    const [, y, m, d] = isoMatch
+    const dt = new Date(Date.UTC(parseInt(y), parseInt(m) - 1, parseInt(d)))
     return isNaN(dt.getTime()) ? null : dt
   }
   return null
+}
+
+function formatMoney(cents: number): string {
+  return '$' + (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function formatDate(dt: Date): string {
+  return `${dt.getUTCMonth() + 1}/${dt.getUTCDate()}/${dt.getUTCFullYear()}`
 }
 
 function parseMoney(s: string): number | null {
@@ -117,7 +126,7 @@ export async function POST(req: NextRequest) {
   const statusMap = new Map(allStatuses.map(s => [s.name.toLowerCase(), s]))
   const defaultStatus = statusMap.get('projected') ?? allStatuses[0]
 
-  const stats = { created: 0, skipped: 0, rowsSkipped: 0 }
+  const stats = { created: 0, updated: 0, skipped: 0, rowsSkipped: 0 }
   const errors: string[] = []
   const unmatched: object[] = []
 
@@ -176,11 +185,49 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    // Check for duplicate
-    const duplicate = await prisma.projectedPayment.findFirst({
-      where: { jobId: job.id, estimateNumber, estimatedPaymentDate },
+    const existing = await prisma.projectedPayment.findFirst({
+      where: { jobId: job.id, estimateNumber },
+      include: { notes: { orderBy: { createdAt: 'desc' }, take: 1 } },
     })
-    if (duplicate) { stats.skipped++; continue }
+
+    if (existing) {
+      const updateData: Record<string, unknown> = {}
+      const noteLines: string[] = []
+
+      const existingDateStr = existing.estimatedPaymentDate.toISOString().split('T')[0]
+      const csvDateStr = estimatedPaymentDate.toISOString().split('T')[0]
+      if (existingDateStr !== csvDateStr) {
+        updateData.estimatedPaymentDate = estimatedPaymentDate
+        noteLines.push(`Import update: Payment date changed from ${formatDate(existing.estimatedPaymentDate)} to ${formatDate(estimatedPaymentDate)}`)
+      }
+
+      if (existing.estimatedAmountOwed !== estimatedAmountOwed) {
+        updateData.estimatedAmountOwed = estimatedAmountOwed
+        noteLines.push(`Import update: Amount changed from ${formatMoney(existing.estimatedAmountOwed)} to ${formatMoney(estimatedAmountOwed)}`)
+      }
+
+      if (billingPeriod !== '—' && existing.billingPeriod !== billingPeriod) {
+        updateData.billingPeriod = billingPeriod
+      }
+
+      if (notes) {
+        noteLines.push(notes)
+      }
+
+      if (Object.keys(updateData).length > 0 || noteLines.length > 0) {
+        await prisma.projectedPayment.update({
+          where: { id: existing.id },
+          data: {
+            ...updateData,
+            ...(noteLines.length > 0 ? { notes: { create: [{ content: noteLines.join('\n') }] } } : {}),
+          },
+        })
+        stats.updated++
+      } else {
+        stats.skipped++
+      }
+      continue
+    }
 
     await prisma.projectedPayment.create({
       data: {

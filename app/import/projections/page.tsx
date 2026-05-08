@@ -21,7 +21,7 @@ interface UnmatchedRow {
 }
 
 interface ImportResult {
-  stats: { created: number; skipped: number; rowsSkipped: number }
+  stats: { created: number; updated: number; skipped: number; rowsSkipped: number }
   errors: string[]
   unmatched: UnmatchedRow[]
   totalRows: number
@@ -174,7 +174,7 @@ export default function ImportProjectionsPage() {
             <span><span className="font-mono text-gray-700">Status</span> — defaults to Projected</span>
             <span><span className="font-mono text-gray-700">Notes</span></span>
           </div>
-          <p className="text-gray-400 mt-2">Duplicate rows (same job + estimate # + date) are skipped automatically.</p>
+          <p className="text-gray-400 mt-2">Existing projections (same job + estimate #) are updated automatically. New ones are created.</p>
         </div>
 
         {!result && (
@@ -236,7 +236,8 @@ export default function ImportProjectionsPage() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               <StatCard label="Projections Created" value={result.stats.created} color="text-green-700" />
-              <StatCard label="Duplicates Skipped" value={result.stats.skipped} color="text-gray-500" note="already existed" />
+              <StatCard label="Projections Updated" value={result.stats.updated} color="text-blue-700" />
+              <StatCard label="No Changes" value={result.stats.skipped} color="text-gray-500" note="already up to date" />
               <StatCard label="Rows Skipped" value={result.stats.rowsSkipped} color="text-gray-500" note="missing data" />
               <StatCard label="Jobs Not Found" value={result.unmatched?.length ?? 0} color={result.unmatched?.length ? 'text-orange-600' : 'text-gray-500'} note="see below" />
             </div>
