@@ -2,9 +2,20 @@
 
 import { useState } from 'react'
 
-const VERSION = 'v1.3.0'
+const VERSION = 'v1.4.0'
 
 const CHANGELOG = [
+  {
+    version: 'v1.4.0',
+    date: 'May 2026',
+    title: 'Partial Payment Tracking',
+    changes: [
+      'Projections now track partial payments — when a payment is less than the balance, the projection is marked Partial and the remaining balance is updated automatically',
+      'System-generated notes are logged on every payment action, clearly labeled [System] to distinguish from user notes',
+      'Post Payment and Apply Payment both support the new partial/full payment logic from their respective entry points',
+      'CSV import now detects Partial-status projections and pauses inline for user review — choose to keep the current balance or update it to the CSV amount',
+    ],
+  },
   {
     version: 'v1.3.0',
     date: 'May 2026',

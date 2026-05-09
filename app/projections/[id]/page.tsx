@@ -238,7 +238,7 @@ export default function ProjectionDetailPage() {
         <div className="bg-green-50 border border-green-200 rounded-xl p-5 mb-4">
           <h3 className="font-semibold text-green-900 mb-1">Post Payment</h3>
           <p className="text-xs text-green-700 mb-4">
-            Creates a cash receipt on <span className="font-medium">{proj.jobNumber} — {proj.jobName}</span> and marks this projection as Received.
+            Creates a cash receipt on <span className="font-medium">{proj.jobNumber} — {proj.jobName}</span>. If the amount equals or exceeds the balance, the projection is marked Received. If less, it is marked Partial and the balance is updated automatically.
           </p>
           <div className="flex flex-wrap gap-4 items-end">
             <Field label="Date Received">
