@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth'
 import LogoutButton from './components/LogoutButton'
+import WhatsNewModal from './components/WhatsNewModal'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -37,6 +38,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </nav>
         )}
         <main className="p-6 max-w-screen-xl mx-auto">{children}</main>
+        <footer className="border-t border-gray-200 bg-white print:hidden">
+          <div className="max-w-screen-xl mx-auto px-6 py-3 flex items-center justify-between">
+            <span className="text-xs text-gray-400">Vibin AR · v1.3.0</span>
+            <WhatsNewModal />
+          </div>
+        </footer>
       </body>
     </html>
   )
