@@ -37,7 +37,7 @@ const ALIASES: Record<string, string[]> = {
   jobName:               ['job name', 'jobname', 'name'],
   company:               ['company'],
   estimateNumber:        ['estimate #', 'estimate#', 'estimate number', 'estimatenumber', 'est #', 'est#', 'est number'],
-  billingPeriod:         ['billing period', 'billingperiod', 'billing'],
+  billingPeriod:         ['billing period', 'billingperiod', 'billing', 'final billing period', 'finalbillingperiod', 'final billing'],
   monthYear:             ['month/year', 'month year', 'monthyear', 'month'],
   estimatedAmountOwed:   ['amount owed', 'estimated amount', 'estimated amount owed', 'amountowed', 'amount'],
   estimatedPaymentDate:  ['expected payment date', 'est payment date', 'estimated payment date', 'payment date', 'expected date', 'est date'],
