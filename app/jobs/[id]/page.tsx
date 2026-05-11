@@ -40,16 +40,13 @@ export default function JobDetailPage() {
   const [editForm, setEditForm] = useState<Record<string, string>>({})
   const [showPayForm, setShowPayForm] = useState(false)
   const [payForm, setPayForm] = useState({ datePmtReceived: '', amountReceived: '', paidThruDate: '', notes: '' })
-  const [payResult, setPayResult] = useState<{ activeProjections: Projection[] } | null>(null)
+  const [payResult, setPayResult] = useState<{ payment: { amountReceived: number }; activeProjections: Projection[] } | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   // Banner state
-  const [bannerStatuses, setBannerStatuses] = useState<Record<string, string>>({})
-  const [followUpOpen, setFollowUpOpen] = useState<Record<string, boolean>>({})
-  const [followUpForms, setFollowUpForms] = useState<Record<string, FollowUpForm>>({})
-  const [followUpCreated, setFollowUpCreated] = useState<Set<string>>(new Set())
-  const [creatingFollowUp, setCreatingFollowUp] = useState<string | null>(null)
+  const [bannerApplied, setBannerApplied] = useState<Record<string, boolean>>({})
+  const [bannerApplying, setBannerApplying] = useState<string | null>(null)
 
   const fetchJob = useCallback(async () => {
     const [jobRes, statusRes] = await Promise.all([
@@ -111,13 +108,7 @@ export default function JobDetailPage() {
       setPayForm({ datePmtReceived: '', amountReceived: '', paidThruDate: '', notes: '' })
       setShowPayForm(false)
       setPayResult(data)
-      // Initialize banner status selections with current projection statuses
-      const initStatuses: Record<string, string> = {}
-      data.activeProjections.forEach((p: Projection) => { initStatuses[p.id] = p.status.id })
-      setBannerStatuses(initStatuses)
-      setFollowUpOpen({})
-      setFollowUpForms({})
-      setFollowUpCreated(new Set())
+      setBannerApplied({})
       fetchJob()
     } else {
       const d = await res.json()
@@ -125,51 +116,16 @@ export default function JobDetailPage() {
     }
   }
 
-  const handleUpdateProjectionStatus = async (projId: string, statusId: string) => {
-    setBannerStatuses(prev => ({ ...prev, [projId]: statusId }))
-    await fetch(`/api/projections/${projId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ statusId }),
-    })
-    const selectedStatus = statuses.find(s => s.id === statusId)
-    if (selectedStatus?.name === 'Partial') {
-      const proj = payResult?.activeProjections.find(p => p.id === projId)
-      setFollowUpForms(prev => ({
-        ...prev,
-        [projId]: { amount: '', date: '', estimateNumber: proj?.estimateNumber ?? '', billingPeriod: '', monthYear: '' },
-      }))
-      setFollowUpOpen(prev => ({ ...prev, [projId]: true }))
-    } else {
-      setFollowUpOpen(prev => ({ ...prev, [projId]: false }))
-    }
-  }
-
-  const handleCreateFollowUp = async (projId: string) => {
-    if (!job) return
-    const form = followUpForms[projId]
-    if (!form?.amount || !form?.date) return
-    setCreatingFollowUp(projId)
-    const projectedStatus = statuses.find(s => s.name === 'Projected') ?? statuses[0]
-    await fetch('/api/projections', {
+  const handleApplyPayment = async (projId: string) => {
+    if (!payResult) return
+    setBannerApplying(projId)
+    await fetch(`/api/projections/${projId}/apply-payment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jobId: job.id,
-        jobNumber: job.jobNumber,
-        jobName: job.jobName,
-        company: job.company,
-        estimatedAmountOwed: Math.round(parseFloat(form.amount) * 100),
-        estimatedPaymentDate: form.date,
-        estimateNumber: form.estimateNumber,
-        billingPeriod: form.billingPeriod,
-        monthYear: form.monthYear,
-        statusId: projectedStatus?.id,
-      }),
+      body: JSON.stringify({ amountReceived: payResult.payment.amountReceived }),
     })
-    setCreatingFollowUp(null)
-    setFollowUpCreated(prev => new Set([...prev, projId]))
-    setFollowUpOpen(prev => ({ ...prev, [projId]: false }))
+    setBannerApplying(null)
+    setBannerApplied(prev => ({ ...prev, [projId]: true }))
     fetchJob()
   }
 
@@ -181,10 +137,7 @@ export default function JobDetailPage() {
 
   const handleDismissBanner = () => {
     setPayResult(null)
-    setBannerStatuses({})
-    setFollowUpOpen({})
-    setFollowUpForms({})
-    setFollowUpCreated(new Set())
+    setBannerApplied({})
   }
 
   const handleDelete = async () => {
@@ -271,80 +224,29 @@ export default function JobDetailPage() {
       {/* Active projections banner */}
       {payResult?.activeProjections && payResult.activeProjections.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
-          <p className="text-sm font-medium text-yellow-800 mb-3">
-            Payment logged. Update the status of active projections:
+          <p className="text-sm font-medium text-yellow-800 mb-1">
+            Payment of {dollars(payResult.payment.amountReceived)} logged.
           </p>
-          <div className="space-y-4">
+          <p className="text-xs text-yellow-700 mb-3">Apply this payment to an active projection below. If the amount is less than the projection balance, it will automatically be marked as Partial and the balance updated.</p>
+          <div className="space-y-2">
             {payResult.activeProjections.map(p => (
-              <div key={p.id}>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className="text-sm text-yellow-700">
-                    Est #{p.estimateNumber} · {dollars(p.estimatedAmountOwed)} · due {fmtDate(p.estimatedPaymentDate)}
-                  </span>
-                  <select
-                    value={bannerStatuses[p.id] ?? p.status.id}
-                    onChange={e => handleUpdateProjectionStatus(p.id, e.target.value)}
-                    className="text-xs border border-yellow-300 rounded px-2 py-1 bg-white"
-                  >
-                    {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                  {followUpCreated.has(p.id) && (
-                    <span className="text-xs text-green-700 font-medium bg-green-100 px-2 py-0.5 rounded-full">✓ Follow-up projection created</span>
+              <div key={p.id} className="flex items-center gap-3 flex-wrap bg-white border border-yellow-200 rounded-lg px-3 py-2">
+                <span className="text-sm text-gray-700 font-medium">Est #{p.estimateNumber}</span>
+                <span className="text-sm text-gray-500">Balance: {dollars(p.estimatedAmountOwed)}</span>
+                <span className="text-sm text-gray-400">due {fmtDate(p.estimatedPaymentDate)}</span>
+                <div className="ml-auto">
+                  {bannerApplied[p.id] ? (
+                    <span className="text-xs text-green-700 font-medium bg-green-100 px-2 py-1 rounded-full">✓ Applied</span>
+                  ) : (
+                    <button
+                      onClick={() => handleApplyPayment(p.id)}
+                      disabled={bannerApplying === p.id}
+                      className="text-xs bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-700 disabled:opacity-50"
+                    >
+                      {bannerApplying === p.id ? 'Applying…' : `Apply ${dollars(payResult.payment.amountReceived)}`}
+                    </button>
                   )}
                 </div>
-
-                {followUpOpen[p.id] && (
-                  <div className="mt-3 pl-4 border-l-2 border-yellow-300">
-                    <p className="text-xs font-medium text-yellow-800 mb-2">Create a follow-up projection for the remaining balance:</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <Field label="Remaining Amount ($) *">
-                        <input
-                          type="number" step="0.01" min="0"
-                          value={followUpForms[p.id]?.amount ?? ''}
-                          onChange={e => setFollowUpForms(prev => ({ ...prev, [p.id]: { ...prev[p.id], amount: e.target.value } }))}
-                          className="input" placeholder="0.00"
-                        />
-                      </Field>
-                      <Field label="New Expected Date *">
-                        <input
-                          type="date"
-                          value={followUpForms[p.id]?.date ?? ''}
-                          onChange={e => setFollowUpForms(prev => ({ ...prev, [p.id]: { ...prev[p.id], date: e.target.value } }))}
-                          className="input"
-                        />
-                      </Field>
-                      <Field label="Est #">
-                        <input
-                          value={followUpForms[p.id]?.estimateNumber ?? ''}
-                          onChange={e => setFollowUpForms(prev => ({ ...prev, [p.id]: { ...prev[p.id], estimateNumber: e.target.value } }))}
-                          className="input"
-                        />
-                      </Field>
-                      <Field label="Billing Period">
-                        <input
-                          value={followUpForms[p.id]?.billingPeriod ?? ''}
-                          onChange={e => setFollowUpForms(prev => ({ ...prev, [p.id]: { ...prev[p.id], billingPeriod: e.target.value } }))}
-                          className="input" placeholder="e.g. 3/1/26–3/31/26"
-                        />
-                      </Field>
-                    </div>
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={() => handleCreateFollowUp(p.id)}
-                        disabled={creatingFollowUp === p.id || !followUpForms[p.id]?.amount || !followUpForms[p.id]?.date}
-                        className="text-sm bg-slate-900 text-white px-4 py-1.5 rounded-lg disabled:opacity-50 hover:bg-slate-700"
-                      >
-                        {creatingFollowUp === p.id ? 'Creating…' : 'Create Projection'}
-                      </button>
-                      <button
-                        onClick={() => setFollowUpOpen(prev => ({ ...prev, [p.id]: false }))}
-                        className="text-sm text-yellow-700 px-3 py-1.5 hover:text-yellow-900"
-                      >
-                        Skip
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
           </div>

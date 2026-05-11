@@ -26,6 +26,14 @@ interface CorruptedValue {
   sampleJobName: string
 }
 
+interface PartialConflict {
+  id: string
+  jobNumber: string
+  estimateNumber: string
+  currentBalance: number
+  csvAmount: number
+}
+
 interface ImportResult {
   stats: { created: number; updated: number; skipped: number; rowsSkipped: number }
   errors: string[]
@@ -57,6 +65,8 @@ export default function ImportProjectionsPage() {
   const [createResult, setCreateResult] = useState<CreateJobsResult | null>(null)
   const [corruptedValues, setCorruptedValues] = useState<CorruptedValue[] | null>(null)
   const [corrections, setCorrections] = useState<Record<string, string>>({})
+  const [partialConflicts, setPartialConflicts] = useState<PartialConflict[] | null>(null)
+  const [partialResolutions, setPartialResolutions] = useState<Record<string, 'update' | 'keep'>>({})
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleFile = (f: File) => {
@@ -68,6 +78,8 @@ export default function ImportProjectionsPage() {
     setCreateResult(null)
     setCorruptedValues(null)
     setCorrections({})
+    setPartialConflicts(null)
+    setPartialResolutions({})
   }
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -77,7 +89,10 @@ export default function ImportProjectionsPage() {
     if (f) handleFile(f)
   }, [])
 
-  const submitImport = async (withCorrections: Record<string, string> = {}) => {
+  const submitImport = async (
+    withCorrections: Record<string, string> = {},
+    withPartialResolutions: Record<string, 'update' | 'keep'> = {}
+  ) => {
     if (!file) return
     setUploading(true)
     setError('')
@@ -88,6 +103,7 @@ export default function ImportProjectionsPage() {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('corrections', JSON.stringify(withCorrections))
+    formData.append('partialResolutions', JSON.stringify(withPartialResolutions))
 
     const res = await fetch('/api/import/projections', { method: 'POST', body: formData })
     const data = await res.json()
@@ -106,7 +122,16 @@ export default function ImportProjectionsPage() {
       return
     }
 
+    if (data.needsPartialReview) {
+      setPartialConflicts(data.partialConflicts)
+      const initial: Record<string, 'update' | 'keep'> = {}
+      data.partialConflicts.forEach((c: PartialConflict) => { initial[c.id] = 'keep' })
+      setPartialResolutions(initial)
+      return
+    }
+
     setCorruptedValues(null)
+    setPartialConflicts(null)
     setResult(data)
     if (data.unmatched?.length) {
       setEditableRows(data.unmatched.map((r: UnmatchedRow) => ({
@@ -128,6 +153,16 @@ export default function ImportProjectionsPage() {
     }
     setError('')
     submitImport(corrections)
+  }
+
+  const handleConfirmPartialResolutions = () => {
+    const unresolved = partialConflicts?.filter(c => !partialResolutions[c.id])
+    if (unresolved?.length) {
+      setError('Please choose an action for every row before continuing.')
+      return
+    }
+    setError('')
+    submitImport(corrections, partialResolutions)
   }
 
   const updateRow = (index: number, patch: Partial<EditableRow>) => {
@@ -174,6 +209,8 @@ export default function ImportProjectionsPage() {
     setCreateResult(null)
     setCorruptedValues(null)
     setCorrections({})
+    setPartialConflicts(null)
+    setPartialResolutions({})
     if (inputRef.current) inputRef.current.value = ''
   }
 
@@ -268,7 +305,83 @@ export default function ImportProjectionsPage() {
           </div>
         )}
 
-        {!result && !corruptedValues && (
+        {/* Partial conflict review step */}
+        {partialConflicts && !result && !corruptedValues && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-blue-500 text-lg">⚠️</span>
+              <span className="font-semibold text-gray-900">Partial payment projections found</span>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              The following projections have a <strong>Partial</strong> status — their current balance reflects a partial payment already applied.
+              Choose whether to update each balance to the CSV amount, or keep the current balance.
+            </p>
+            <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-4 py-2 text-xs text-gray-500 font-medium">Job #</th>
+                    <th className="text-left px-4 py-2 text-xs text-gray-500 font-medium">Est #</th>
+                    <th className="text-right px-4 py-2 text-xs text-gray-500 font-medium">Current Balance</th>
+                    <th className="text-right px-4 py-2 text-xs text-gray-500 font-medium">CSV Amount</th>
+                    <th className="text-center px-4 py-2 text-xs text-gray-500 font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {partialConflicts.map(c => (
+                    <tr key={c.id} className="bg-white">
+                      <td className="px-4 py-3 font-mono text-gray-800">{c.jobNumber}</td>
+                      <td className="px-4 py-3 text-gray-600">{c.estimateNumber}</td>
+                      <td className="px-4 py-3 text-right font-mono text-blue-700">{dollars(c.currentBalance)}</td>
+                      <td className="px-4 py-3 text-right font-mono text-gray-700">{dollars(c.csvAmount)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-3">
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={`partial-${c.id}`}
+                              value="keep"
+                              checked={partialResolutions[c.id] === 'keep'}
+                              onChange={() => setPartialResolutions(prev => ({ ...prev, [c.id]: 'keep' }))}
+                              className="accent-blue-600"
+                            />
+                            <span className="text-xs text-gray-600">Keep balance</span>
+                          </label>
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={`partial-${c.id}`}
+                              value="update"
+                              checked={partialResolutions[c.id] === 'update'}
+                              onChange={() => setPartialResolutions(prev => ({ ...prev, [c.id]: 'update' }))}
+                              className="accent-blue-600"
+                            />
+                            <span className="text-xs text-gray-600">Update to CSV</span>
+                          </label>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirmPartialResolutions}
+                disabled={uploading}
+                className="bg-slate-900 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
+              >
+                {uploading ? 'Importing…' : 'Confirm & Import'}
+              </button>
+              <button onClick={reset} className="text-sm text-gray-500 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!result && !corruptedValues && !partialConflicts && (
           <>
             <div
               onDragOver={e => { e.preventDefault(); setDragging(true) }}

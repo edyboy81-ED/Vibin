@@ -37,7 +37,7 @@ const ALIASES: Record<string, string[]> = {
   jobName:               ['job name', 'jobname', 'name'],
   company:               ['company'],
   estimateNumber:        ['estimate #', 'estimate#', 'estimate number', 'estimatenumber', 'est #', 'est#', 'est number'],
-  billingPeriod:         ['billing period', 'billingperiod', 'billing'],
+  billingPeriod:         ['billing period', 'billingperiod', 'billing', 'final billing period', 'finalbillingperiod', 'final billing'],
   monthYear:             ['month/year', 'month year', 'monthyear', 'month'],
   estimatedAmountOwed:   ['amount owed', 'estimated amount', 'estimated amount owed', 'amountowed', 'amount'],
   estimatedPaymentDate:  ['expected payment date', 'est payment date', 'estimated payment date', 'payment date', 'expected date', 'est date'],
@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
   if (!file) return NextResponse.json({ error: 'No file uploaded' }, { status: 400 })
 
   const corrections: Record<string, string> = JSON.parse(formData.get('corrections') as string || '{}')
+  const partialResolutions: Record<string, 'update' | 'keep'> = JSON.parse(formData.get('partialResolutions') as string || '{}')
 
   const text = await file.text()
   const rows = parseCSV(text)
@@ -149,6 +150,34 @@ export async function POST(req: NextRequest) {
   const jobMap = new Map(allJobs.map(j => [j.jobNumber, j]))
   const statusMap = new Map(allStatuses.map(s => [s.name.toLowerCase(), s]))
   const defaultStatus = statusMap.get('projected') ?? allStatuses[0]
+
+  // Pre-scan for partial projection conflicts
+  const partialProjections = await prisma.projectedPayment.findMany({
+    where: { status: { name: 'Partial' }, isActive: true },
+    select: { id: true, jobId: true, estimateNumber: true, estimatedAmountOwed: true, jobNumber: true, jobName: true },
+  })
+  const partialMap = new Map(partialProjections.map(p => [`${p.jobId}:${p.estimateNumber}`, p]))
+
+  const partialConflicts: { id: string; jobNumber: string; estimateNumber: string; currentBalance: number; csvAmount: number }[] = []
+  for (const row of rows) {
+    const get = (field: string) => colMap[field] ? row[colMap[field]] ?? '' : ''
+    let jn = get('jobNumber').trim()
+    if (corrections[jn]) jn = corrections[jn].trim()
+    const job = jobMap.get(jn)
+    if (!job) continue
+    const en = get('estimateNumber') || '—'
+    const csvAmount = parseMoney(get('estimatedAmountOwed'))
+    const partial = partialMap.get(`${job.id}:${en}`)
+    if (partial && csvAmount !== null && partial.estimatedAmountOwed !== csvAmount && !partialResolutions[partial.id]) {
+      if (!partialConflicts.find(c => c.id === partial.id)) {
+        partialConflicts.push({ id: partial.id, jobNumber: partial.jobNumber, estimateNumber: partial.estimateNumber, currentBalance: partial.estimatedAmountOwed, csvAmount })
+      }
+    }
+  }
+
+  if (partialConflicts.length > 0) {
+    return NextResponse.json({ needsPartialReview: true, partialConflicts })
+  }
 
   const stats = { created: 0, updated: 0, skipped: 0, rowsSkipped: 0 }
   const errors: string[] = []
@@ -214,7 +243,7 @@ export async function POST(req: NextRequest) {
 
     const existing = await prisma.projectedPayment.findFirst({
       where: { jobId: job.id, estimateNumber },
-      include: { notes: { orderBy: { createdAt: 'desc' }, take: 1 } },
+      include: { status: true, notes: { orderBy: { createdAt: 'desc' }, take: 1 } },
     })
 
     if (existing) {
@@ -228,9 +257,18 @@ export async function POST(req: NextRequest) {
         noteLines.push(`Import update: Payment date changed from ${formatDate(existing.estimatedPaymentDate)} to ${formatDate(estimatedPaymentDate)}`)
       }
 
+      const isPartial = existing.status?.name?.toLowerCase() === 'partial'
       if (existing.estimatedAmountOwed !== estimatedAmountOwed) {
-        updateData.estimatedAmountOwed = estimatedAmountOwed
-        noteLines.push(`Import update: Amount changed from ${formatMoney(existing.estimatedAmountOwed)} to ${formatMoney(estimatedAmountOwed)}`)
+        if (isPartial) {
+          if (partialResolutions[existing.id] === 'update') {
+            updateData.estimatedAmountOwed = estimatedAmountOwed
+            noteLines.push(`[System] Import update: Amount updated to ${formatMoney(estimatedAmountOwed)} per CSV.`)
+          }
+          // if 'keep', skip amount update silently
+        } else {
+          updateData.estimatedAmountOwed = estimatedAmountOwed
+          noteLines.push(`Import update: Amount changed from ${formatMoney(existing.estimatedAmountOwed)} to ${formatMoney(estimatedAmountOwed)}`)
+        }
       }
 
       if (billingPeriod !== '—' && existing.billingPeriod !== billingPeriod) {
