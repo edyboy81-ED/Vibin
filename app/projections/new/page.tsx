@@ -24,6 +24,8 @@ export default function NewProjectionPage() {
   const searchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [savedId, setSavedId] = useState<string | null>(null)
+  const [savedLabel, setSavedLabel] = useState('')
 
   const [form, setForm] = useState({
     jobId: '', jobNumber: '', jobName: '', company: 'Johnson Bros Corporation',
@@ -80,11 +82,25 @@ export default function NewProjectionPage() {
     setSubmitting(false)
     if (res.ok) {
       const data = await res.json()
-      router.push(`/projections/${data.id}`)
+      setSavedId(data.id)
+      setSavedLabel(`${form.jobNumber}${form.estimateNumber ? ' · Est #' + form.estimateNumber : ''}`)
     } else {
       const d = await res.json()
       setError(d.error ?? 'Failed to create projection')
     }
+  }
+
+  const handleAddAnother = (keepJob: boolean) => {
+    const defaultStatus = statuses.find(s => s.name === 'Projected')?.id ?? ''
+    if (keepJob) {
+      setForm(f => ({ ...f, monthYear: '', estimateNumber: '', billingPeriod: '', estimatedAmountOwed: '', estimatedPaymentDate: '', initialNote: '', statusId: defaultStatus }))
+    } else {
+      setForm({ jobId: '', jobNumber: '', jobName: '', company: 'Johnson Bros Corporation', monthYear: '', estimateNumber: '', billingPeriod: '', estimatedAmountOwed: '', estimatedPaymentDate: '', statusId: defaultStatus, initialNote: '' })
+      setJobDetails(null)
+    }
+    setSavedId(null)
+    setSavedLabel('')
+    setError('')
   }
 
   const division = getDivision(form.company)
@@ -96,6 +112,34 @@ export default function NewProjectionPage() {
         <span className="text-gray-300">/</span>
         <span className="font-semibold text-gray-900">New Projection</span>
       </div>
+
+      {savedId && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-green-600 font-medium text-sm">✓ Projection created — {savedLabel}</span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => handleAddAnother(true)}
+              className="px-4 py-1.5 rounded-lg text-sm font-medium bg-white border border-green-300 text-green-700 hover:bg-green-50"
+            >
+              + Add Another for Same Job
+            </button>
+            <button
+              onClick={() => handleAddAnother(false)}
+              className="px-4 py-1.5 rounded-lg text-sm font-medium bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+            >
+              + Add Different Job
+            </button>
+            <Link
+              href={`/projections/${savedId}`}
+              className="px-4 py-1.5 rounded-lg text-sm font-medium bg-slate-900 text-white hover:bg-slate-700"
+            >
+              View Projection →
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
