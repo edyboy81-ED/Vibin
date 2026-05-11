@@ -189,6 +189,21 @@ function JobsContent() {
             Clear dates
           </button>
         )}
+        <div className="flex items-center gap-1 ml-auto">
+          {(['', 'LEGACY', 'AB'] as const).map(d => (
+            <button
+              key={d}
+              onClick={() => setFilterDivision(d)}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                filterDivision === d
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400 hover:text-gray-700'
+              }`}
+            >
+              {d === '' ? 'All' : d === 'LEGACY' ? 'Legacy' : 'AB'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Table */}
