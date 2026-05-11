@@ -257,6 +257,7 @@ function ProjectionTable({ rows }: { rows: Projection[] }) {
           <Th>Est #</Th>
           <Th>Billing Period</Th>
           <Th>Amount</Th>
+          <Th>Exp. Payment Date</Th>
           <Th>Status</Th>
           <Th>Latest Note</Th>
           <Th></Th>
@@ -270,6 +271,7 @@ function ProjectionTable({ rows }: { rows: Projection[] }) {
             <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{p.estimateNumber}</td>
             <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{p.billingPeriod}</td>
             <td className="px-4 py-3 font-mono whitespace-nowrap">{dollars(p.estimatedAmountOwed)}</td>
+            <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(p.estimatedPaymentDate)}</td>
             <td className="px-4 py-3">
               <span className="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap" style={{ backgroundColor: p.status.color + '22', color: p.status.color }}>
                 {p.status.name}
