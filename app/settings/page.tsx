@@ -6,6 +6,14 @@ interface Status { id: string; name: string; color: string; isSystem: boolean; s
 
 const PRESET_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#f97316', '#ef4444', '#8b5cf6', '#ec4899', '#6b7280']
 
+type ThemeId = 'slate-emerald' | 'white-indigo' | 'dark-mode' | 'warm-neutral'
+const THEMES: { id: ThemeId; name: string; description: string; swatches: string[] }[] = [
+  { id: 'slate-emerald', name: 'Slate & Emerald', description: 'Dark slate cards with emerald green accents. Professional finance feel.', swatches: ['#1e293b', '#10b981', '#f59e0b', '#38bdf8'] },
+  { id: 'white-indigo',  name: 'White & Indigo',  description: 'Clean white cards with indigo left-bar accents. Modern SaaS feel.', swatches: ['#ffffff', '#6366f1', '#7c3aed', '#f97316'] },
+  { id: 'dark-mode',     name: 'Dark Mode',        description: 'Very dark cards with color-coded KPIs. Executive dashboard feel.', swatches: ['#020617', '#3b82f6', '#34d399', '#fbbf24'] },
+  { id: 'warm-neutral',  name: 'Warm Neutral',     description: 'White shadow cards with teal accents. Approachable and clean.', swatches: ['#ffffff', '#0d9488', '#0891b2', '#d97706'] },
+]
+
 export default function SettingsPage() {
   const [statuses, setStatuses] = useState<Status[]>([])
   const [loading, setLoading] = useState(true)
@@ -16,6 +24,17 @@ export default function SettingsPage() {
   const [editForm, setEditForm] = useState({ name: '', color: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [activeTheme, setActiveTheme] = useState<ThemeId>('slate-emerald')
+
+  useEffect(() => {
+    const saved = localStorage.getItem('vibin-dashboard-theme') as ThemeId | null
+    if (saved) setActiveTheme(saved)
+  }, [])
+
+  const selectTheme = (id: ThemeId) => {
+    setActiveTheme(id)
+    localStorage.setItem('vibin-dashboard-theme', id)
+  }
 
   const fetchStatuses = useCallback(async () => {
     const res = await fetch('/api/projection-statuses')
@@ -187,6 +206,41 @@ export default function SettingsPage() {
             ))}
           </div>
         )}
+      </div>
+      {/* Dashboard Theme */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mt-6">
+        <h2 className="font-semibold text-gray-900 mb-1">Dashboard Theme</h2>
+        <p className="text-sm text-gray-400 mb-5">Choose how your dashboard looks. Your selection is saved in this browser.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {THEMES.map(theme => (
+            <button
+              key={theme.id}
+              onClick={() => selectTheme(theme.id)}
+              className={`text-left rounded-xl border-2 p-4 transition-all ${
+                activeTheme === theme.id
+                  ? 'border-slate-900 bg-slate-50'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-medium text-sm text-gray-900">{theme.name}</span>
+                {activeTheme === theme.id && (
+                  <span className="text-xs bg-slate-900 text-white px-2 py-0.5 rounded-full">Active</span>
+                )}
+              </div>
+              <div className="flex gap-1.5 mb-2">
+                {theme.swatches.map((color, i) => (
+                  <div
+                    key={i}
+                    className="w-6 h-6 rounded-md border border-gray-200"
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+              <p className="text-xs text-gray-400">{theme.description}</p>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )

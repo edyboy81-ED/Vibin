@@ -7,7 +7,7 @@ const VERSION = 'v1.4.0'
 const CHANGELOG = [
   {
     version: 'v1.4.0',
-    date: 'May 2026',
+    date: 'May 11, 2026',
     title: 'Partial Payment Tracking',
     changes: [
       'Projections now track partial payments — when a payment is less than the balance, the projection is marked Partial and the remaining balance is updated automatically',
@@ -19,7 +19,7 @@ const CHANGELOG = [
   },
   {
     version: 'v1.3.0',
-    date: 'May 2026',
+    date: 'May 8, 2026',
     title: 'Projection Intelligence',
     changes: [
       'Received projections excluded from dashboard KPI cards and Friday Report totals even when payment date is in the future (early payment support)',
@@ -28,7 +28,7 @@ const CHANGELOG = [
   },
   {
     version: 'v1.2.0',
-    date: 'May 2026',
+    date: 'May 8, 2026',
     title: 'Import Improvements',
     changes: [
       'Excel date corruption detection — import pauses and prompts user to correct job numbers auto-formatted as dates by Excel (e.g. Oct-69 → 10-2369)',
@@ -41,7 +41,7 @@ const CHANGELOG = [
   },
   {
     version: 'v1.1.0',
-    date: 'April–May 2026',
+    date: 'April 28, 2026',
     title: 'Reporting & Dashboard',
     changes: [
       'Friday Report — print support added',
@@ -58,7 +58,7 @@ const CHANGELOG = [
   },
   {
     version: 'v1.0.1',
-    date: 'April 2026',
+    date: 'April 27, 2026',
     title: 'Cash Receipts Enhancements',
     changes: [
       'Cash receipts view rebuilt to be payment-centric with correct totals',
@@ -71,7 +71,7 @@ const CHANGELOG = [
   },
   {
     version: 'v1.0.0',
-    date: 'April 2026',
+    date: 'April 24, 2026',
     title: 'Initial Release',
     changes: [
       'Dashboard with weekly cash receipt KPIs and projected payment summaries',

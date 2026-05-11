@@ -3,6 +3,16 @@
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { dollars, fmtDate } from '@/lib/format'
+
+function getThisWeek() {
+  const today = new Date()
+  const day = today.getDay()
+  const diffToMon = (day === 0 ? -6 : 1 - day)
+  const mon = new Date(today); mon.setDate(today.getDate() + diffToMon)
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+  const fmt = (d: Date) => d.toISOString().split('T')[0]
+  return { from: fmt(mon), to: fmt(sun) }
+}
 import { ALL_COMPANIES } from '@/lib/companies'
 import Link from 'next/link'
 
@@ -147,6 +157,16 @@ function ProjectionsContent() {
           <label className="text-xs font-medium text-gray-500">to</label>
           <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="input w-40" />
         </div>
+        <button
+          onClick={() => { const w = getThisWeek(); setFilterDateFrom(w.from); setFilterDateTo(w.to) }}
+          className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+            hasDateFilter && filterDateFrom === getThisWeek().from && filterDateTo === getThisWeek().to
+              ? 'bg-slate-900 text-white border-slate-900'
+              : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400 hover:text-gray-700'
+          }`}
+        >
+          This Week
+        </button>
         {hasDateFilter && (
           <button
             onClick={() => { setFilterDateFrom(''); setFilterDateTo('') }}
@@ -155,6 +175,21 @@ function ProjectionsContent() {
             Clear dates
           </button>
         )}
+        <div className="flex items-center gap-1 ml-auto">
+          {(['', 'LEGACY', 'AB'] as const).map(d => (
+            <button
+              key={d}
+              onClick={() => setFilterDivision(d)}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                filterDivision === d
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400 hover:text-gray-700'
+              }`}
+            >
+              {d === '' ? 'All' : d === 'LEGACY' ? 'Legacy' : 'AB'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
@@ -222,6 +257,7 @@ function ProjectionTable({ rows }: { rows: Projection[] }) {
           <Th>Est #</Th>
           <Th>Billing Period</Th>
           <Th>Amount</Th>
+          <Th>Exp. Payment Date</Th>
           <Th>Status</Th>
           <Th>Latest Note</Th>
           <Th></Th>
@@ -235,6 +271,7 @@ function ProjectionTable({ rows }: { rows: Projection[] }) {
             <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{p.estimateNumber}</td>
             <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{p.billingPeriod}</td>
             <td className="px-4 py-3 font-mono whitespace-nowrap">{dollars(p.estimatedAmountOwed)}</td>
+            <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(p.estimatedPaymentDate)}</td>
             <td className="px-4 py-3">
               <span className="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap" style={{ backgroundColor: p.status.color + '22', color: p.status.color }}>
                 {p.status.name}
