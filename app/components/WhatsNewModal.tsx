@@ -14,6 +14,7 @@ const CHANGELOG = [
       'System-generated notes are logged on every payment action, clearly labeled [System] to distinguish from user notes',
       'Post Payment and Apply Payment both support the new partial/full payment logic from their respective entry points',
       'CSV import now detects Partial-status projections and pauses inline for user review — choose to keep the current balance or update it to the CSV amount',
+      'CSV import now recognizes "Final Billing Period" as a valid column name for the Billing Period field',
     ],
   },
   {
