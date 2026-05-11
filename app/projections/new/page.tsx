@@ -84,6 +84,7 @@ export default function NewProjectionPage() {
       const data = await res.json()
       setSavedId(data.id)
       setSavedLabel(`${form.jobNumber}${form.estimateNumber ? ' · Est #' + form.estimateNumber : ''}`)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     } else {
       const d = await res.json()
       setError(d.error ?? 'Failed to create projection')
