@@ -3,6 +3,16 @@
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { dollars, fmtDate } from '@/lib/format'
+
+function getThisWeek() {
+  const today = new Date()
+  const day = today.getDay()
+  const diffToMon = (day === 0 ? -6 : 1 - day)
+  const mon = new Date(today); mon.setDate(today.getDate() + diffToMon)
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+  const fmt = (d: Date) => d.toISOString().split('T')[0]
+  return { from: fmt(mon), to: fmt(sun) }
+}
 import { ALL_COMPANIES } from '@/lib/companies'
 import Link from 'next/link'
 
@@ -147,6 +157,16 @@ function ProjectionsContent() {
           <label className="text-xs font-medium text-gray-500">to</label>
           <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="input w-40" />
         </div>
+        <button
+          onClick={() => { const w = getThisWeek(); setFilterDateFrom(w.from); setFilterDateTo(w.to) }}
+          className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+            hasDateFilter && filterDateFrom === getThisWeek().from && filterDateTo === getThisWeek().to
+              ? 'bg-slate-900 text-white border-slate-900'
+              : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400 hover:text-gray-700'
+          }`}
+        >
+          This Week
+        </button>
         {hasDateFilter && (
           <button
             onClick={() => { setFilterDateFrom(''); setFilterDateTo('') }}
