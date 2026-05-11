@@ -158,11 +158,6 @@ export default function DashboardView({ data: d }: { data: DashboardData }) {
     if (saved && THEMES[saved]) setThemeId(saved)
   }, [])
 
-  const changeTheme = (id: ThemeId) => {
-    setThemeId(id)
-    localStorage.setItem('vibin-dashboard-theme', id)
-  }
-
   const t = THEMES[themeId]
 
   return (
@@ -173,30 +168,9 @@ export default function DashboardView({ data: d }: { data: DashboardData }) {
           <h1 className={`text-3xl font-bold tracking-tight ${t.heading}`}>Dashboard</h1>
           <p className={`text-sm mt-1 ${t.subheading}`}>Next Friday report: {fmtDate(d.friday)}</p>
         </div>
-        <div className="flex flex-col items-end gap-2.5">
-          <Link href="/report" className={`px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition-colors ${t.button}`}>
-            Build Friday Report →
-          </Link>
-          {/* Theme picker */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400">{t.name}</span>
-            <div className="flex items-center gap-1.5">
-              {(Object.values(THEMES) as ThemeConfig[]).map(th => (
-                <button
-                  key={th.id}
-                  onClick={() => changeTheme(th.id)}
-                  title={th.name}
-                  className={`w-4 h-4 rounded-full transition-all ${
-                    themeId === th.id
-                      ? 'ring-2 ring-offset-1 ring-gray-400 scale-125'
-                      : 'opacity-50 hover:opacity-100 hover:scale-110'
-                  }`}
-                  style={{ backgroundColor: th.swatch }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
+        <Link href="/report" className={`px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition-colors ${t.button}`}>
+          Build Friday Report →
+        </Link>
       </div>
 
       {/* This week's cash receipts */}
