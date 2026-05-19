@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { dollars, fmtDate } from '@/lib/format'
 import { ALL_COMPANIES } from '@/lib/companies'
@@ -50,6 +50,8 @@ function JobsContent() {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState(searchParams.get('dateFrom') ?? '')
   const [filterDateTo, setFilterDateTo] = useState(searchParams.get('dateTo') ?? '')
+  const [groupByJob, setGroupByJob] = useState(false)
+  const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set())
 
   const fetchPayments = useCallback(async () => {
     const res = await fetch('/api/payments')
@@ -79,6 +81,25 @@ function JobsContent() {
 
   const filteredTotal = useMemo(() => filtered.reduce((s, p) => s + p.amountReceived, 0), [filtered])
   const hasDateFilter = filterDateFrom || filterDateTo
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, { job: PaymentRow['job']; payments: PaymentRow[]; total: number }>()
+    for (const p of filtered) {
+      if (!map.has(p.job.id)) map.set(p.job.id, { job: p.job, payments: [], total: 0 })
+      const g = map.get(p.job.id)!
+      g.payments.push(p)
+      g.total += p.amountReceived
+    }
+    return Array.from(map.values()).sort((a, b) => a.job.jobNumber.localeCompare(b.job.jobNumber))
+  }, [filtered])
+
+  const toggleJob = (id: string) => {
+    setExpandedJobs(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) { next.delete(id) } else { next.add(id) }
+      return next
+    })
+  }
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -229,70 +250,175 @@ function JobsContent() {
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between text-xs text-gray-500">
-          <span>
-            {filtered.length} payment{filtered.length !== 1 ? 's' : ''}
-            {hasDateFilter && <span className="ml-2 text-blue-600 font-medium">· filtered by payment date</span>}
-          </span>
+          <div className="flex items-center gap-3">
+            <span>
+              {groupByJob
+                ? `${grouped.length} job${grouped.length !== 1 ? 's' : ''}`
+                : `${filtered.length} payment${filtered.length !== 1 ? 's' : ''}`}
+              {hasDateFilter && <span className="ml-2 text-blue-600 font-medium">· filtered by payment date</span>}
+            </span>
+            <button
+              onClick={() => setGroupByJob(g => !g)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                groupByJob
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400 hover:text-gray-700'
+              }`}
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h8M4 18h8" />
+              </svg>
+              Group by Job
+            </button>
+          </div>
           {filtered.length > 0 && (
             <span className="font-mono font-semibold text-gray-700">{dollars(filteredTotal)}</span>
           )}
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <Th>Job #</Th>
-                <Th>Job Name</Th>
-                <Th>Company</Th>
-                <Th>Status</Th>
-                <Th>Date Received</Th>
-                <Th>Amount</Th>
-                <Th>Paid Thru</Th>
-                <Th></Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No payments found.</td></tr>
-              ) : filtered.map(p => (
-                <tr
-                  key={p.id}
-                  className="hover:bg-slate-50 cursor-pointer"
-                  onClick={() => window.location.href = `/jobs/${p.job.id}`}
-                >
-                  <td className="px-4 py-3 font-mono text-xs font-medium whitespace-nowrap">{p.job.jobNumber}</td>
-                  <td className="px-4 py-3">
-                    <div className="text-gray-800">{p.job.jobName}</div>
-                    {p.job.customer && <div className="text-xs text-gray-400">{p.job.customer}</div>}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="text-xs text-gray-600">{p.job.company}</div>
-                    <div className="text-xs text-gray-400">{p.job.division}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={p.job.jobStatus} />
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDate(p.datePmtReceived)}</td>
-                  <td className="px-4 py-3 font-mono font-medium whitespace-nowrap">{dollars(p.amountReceived)}</td>
-                  <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{p.paidThruDate ? fmtDate(p.paidThruDate) : '—'}</td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
-                    {p.job._count.projections > 0 && (
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mr-2">{p.job._count.projections} proj</span>
-                    )}
-                    <Link
-                      href={`/jobs/${p.job.id}`}
-                      onClick={e => e.stopPropagation()}
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      View →
-                    </Link>
-                  </td>
+          {groupByJob ? (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <Th></Th>
+                  <Th>Job #</Th>
+                  <Th>Job Name</Th>
+                  <Th>Company</Th>
+                  <Th>Status</Th>
+                  <Th>Payments</Th>
+                  <Th>Total Received</Th>
+                  <Th></Th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {loading ? (
+                  <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
+                ) : grouped.length === 0 ? (
+                  <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No payments found.</td></tr>
+                ) : grouped.map(g => {
+                  const isOpen = expandedJobs.has(g.job.id)
+                  return (
+                    <React.Fragment key={g.job.id}>
+                      <tr
+                        key={g.job.id}
+                        className="hover:bg-slate-50 cursor-pointer bg-gray-50/60"
+                        onClick={() => toggleJob(g.job.id)}
+                      >
+                        <td className="pl-4 pr-2 py-3 w-6">
+                          <svg
+                            className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap">{g.job.jobNumber}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-gray-800">{g.job.jobName}</div>
+                          {g.job.customer && <div className="text-xs text-gray-400">{g.job.customer}</div>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-xs text-gray-600">{g.job.company}</div>
+                          <div className="text-xs text-gray-400">{g.job.division}</div>
+                        </td>
+                        <td className="px-4 py-3"><StatusBadge status={g.job.jobStatus} /></td>
+                        <td className="px-4 py-3 text-gray-500 text-xs">{g.payments.length} payment{g.payments.length !== 1 ? 's' : ''}</td>
+                        <td className="px-4 py-3 font-mono font-semibold whitespace-nowrap">{dollars(g.total)}</td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          {g.job._count.projections > 0 && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mr-2">{g.job._count.projections} proj</span>
+                          )}
+                          <Link
+                            href={`/jobs/${g.job.id}`}
+                            onClick={e => e.stopPropagation()}
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            View →
+                          </Link>
+                        </td>
+                      </tr>
+                      {isOpen && g.payments.map(p => (
+                        <tr
+                          key={p.id}
+                          className="hover:bg-blue-50/30 cursor-pointer border-t border-gray-50"
+                          onClick={() => window.location.href = `/jobs/${p.job.id}`}
+                        >
+                          <td className="pl-4 pr-2 py-2.5">
+                            <div className="w-3.5 flex justify-center">
+                              <div className="w-px h-4 bg-gray-200" />
+                            </div>
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-gray-400 font-mono" />
+                          <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(p.datePmtReceived)}</td>
+                          <td className="px-4 py-2.5" />
+                          <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">{p.paidThruDate ? `Paid thru ${fmtDate(p.paidThruDate)}` : ''}</td>
+                          <td className="px-4 py-2.5" />
+                          <td className="px-4 py-2.5 font-mono text-sm font-medium whitespace-nowrap">{dollars(p.amountReceived)}</td>
+                          <td className="px-4 py-2.5 text-right text-xs text-gray-400">{p.notes || ''}</td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <Th>Job #</Th>
+                  <Th>Job Name</Th>
+                  <Th>Company</Th>
+                  <Th>Status</Th>
+                  <Th>Date Received</Th>
+                  <Th>Amount</Th>
+                  <Th>Paid Thru</Th>
+                  <Th></Th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {loading ? (
+                  <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No payments found.</td></tr>
+                ) : filtered.map(p => (
+                  <tr
+                    key={p.id}
+                    className="hover:bg-slate-50 cursor-pointer"
+                    onClick={() => window.location.href = `/jobs/${p.job.id}`}
+                  >
+                    <td className="px-4 py-3 font-mono text-xs font-medium whitespace-nowrap">{p.job.jobNumber}</td>
+                    <td className="px-4 py-3">
+                      <div className="text-gray-800">{p.job.jobName}</div>
+                      {p.job.customer && <div className="text-xs text-gray-400">{p.job.customer}</div>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-xs text-gray-600">{p.job.company}</div>
+                      <div className="text-xs text-gray-400">{p.job.division}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={p.job.jobStatus} />
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDate(p.datePmtReceived)}</td>
+                    <td className="px-4 py-3 font-mono font-medium whitespace-nowrap">{dollars(p.amountReceived)}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{p.paidThruDate ? fmtDate(p.paidThruDate) : '—'}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      {p.job._count.projections > 0 && (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mr-2">{p.job._count.projections} proj</span>
+                      )}
+                      <Link
+                        href={`/jobs/${p.job.id}`}
+                        onClick={e => e.stopPropagation()}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        View →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
