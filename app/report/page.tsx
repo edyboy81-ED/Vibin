@@ -118,11 +118,12 @@ export default function ReportPage() {
           </div>
 
           {/* Summary totals */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
             <SummaryCard label="Legacy Receipts" value={dollars(data.legacyReceiptsTotal)} color="text-slate-700" />
             <SummaryCard label="AB Receipts" value={dollars(data.abReceiptsTotal)} color="text-blue-700" />
             <SummaryCard label="Combined Receipts" value={dollars(data.combinedReceiptsTotal)} color="text-green-700" bold />
-            <SummaryCard label="Next Week Projected" value={dollars(nextWeekTotal)} color="text-orange-700" />
+            <SummaryCard label="This Week's Target" value={dollars(data.thisWeekProjectedTotal)} color="text-orange-700" />
+            <VarianceCard actual={data.combinedReceiptsTotal} target={data.thisWeekProjectedTotal} />
           </div>
 
           {/* Next week projections */}
@@ -189,6 +190,25 @@ function SummaryCard({ label, value, color, bold }: { label: string; value: stri
     <div className="bg-white rounded-xl border border-gray-200 p-4">
       <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">{label}</p>
       <p className={`text-lg font-mono ${bold ? 'font-bold' : 'font-medium'} ${color}`}>{value}</p>
+    </div>
+  )
+}
+
+function VarianceCard({ actual, target }: { actual: number; target: number }) {
+  const variance = actual - target
+  const pct = target > 0 ? (variance / target) * 100 : null
+  const positive = variance >= 0
+  const color = target === 0 ? 'text-gray-400' : positive ? 'text-green-600' : 'text-red-600'
+  const bg = target === 0 ? '' : positive ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+  const sign = variance > 0 ? '+' : ''
+  const valueStr = target === 0
+    ? '—'
+    : `${sign}${dollars(Math.abs(variance))} / ${sign}${pct!.toFixed(1)}%`
+
+  return (
+    <div className={`rounded-xl border p-4 ${bg || 'bg-white border-gray-200'}`}>
+      <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Var. from Target</p>
+      <p className={`text-lg font-mono font-bold ${color}`}>{valueStr}</p>
     </div>
   )
 }

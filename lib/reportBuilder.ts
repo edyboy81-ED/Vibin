@@ -58,6 +58,8 @@ export interface ReportData {
   legacyReceiptsTotal: number
   abReceiptsTotal: number
   combinedReceiptsTotal: number
+  // This week's projected target (all projections due this week)
+  thisWeekProjectedTotal: number
   // Projections
   nextWeekSections: ReportSection[]
   futureSections: ReportSection[]
@@ -87,10 +89,16 @@ export async function buildReport(reportDate: Date): Promise<ReportData> {
   const lastWeekEnd = utcEndOfDay(utcAddDays(friday, -7))
 
   // --- Cash receipts this week ---
-  const weekPayments = await prisma.payment.findMany({
-    where: { datePmtReceived: { gte: weekStart, lte: weekEnd } },
-    include: { job: { select: { division: true, jobNumber: true, jobName: true } } },
-  })
+  const [weekPayments, thisWeekProjections] = await Promise.all([
+    prisma.payment.findMany({
+      where: { datePmtReceived: { gte: weekStart, lte: weekEnd } },
+      include: { job: { select: { division: true, jobNumber: true, jobName: true } } },
+    }),
+    prisma.projectedPayment.findMany({
+      where: { estimatedPaymentDate: { gte: weekStart, lte: weekEnd }, isActive: true },
+      select: { estimatedAmountOwed: true },
+    }),
+  ])
 
   const legacyReceiptsTotal = weekPayments
     .filter(p => p.job.division === 'LEGACY')
@@ -148,6 +156,7 @@ export async function buildReport(reportDate: Date): Promise<ReportData> {
     legacyReceiptsTotal,
     abReceiptsTotal,
     combinedReceiptsTotal: legacyReceiptsTotal + abReceiptsTotal,
+    thisWeekProjectedTotal: thisWeekProjections.reduce((s, p) => s + p.estimatedAmountOwed, 0),
     nextWeekSections: groupByDate(nextWeekProjections),
     futureSections: groupByDate(futureProjections),
     lastWeekStatus: lastWeekProjections.map(p => ({
@@ -224,9 +233,18 @@ export function generateEmailBody(data: ReportData): string {
   lines.push(div)
   lines.push('WEEKLY CASH RECEIPTS')
   lines.push(div)
-  lines.push(`  Legacy:    ${dollars(data.legacyReceiptsTotal)}`)
-  lines.push(`  AB:        ${dollars(data.abReceiptsTotal)}`)
-  lines.push(`  Combined:  ${dollars(data.combinedReceiptsTotal)}`)
+  const variance = data.combinedReceiptsTotal - data.thisWeekProjectedTotal
+  const pct = data.thisWeekProjectedTotal > 0 ? (variance / data.thisWeekProjectedTotal) * 100 : null
+  const varSign = variance >= 0 ? '+' : ''
+  const varStr = data.thisWeekProjectedTotal > 0
+    ? `${varSign}${dollars(Math.abs(variance))} / ${varSign}${pct!.toFixed(1)}%`
+    : 'N/A (no projections for this week)'
+
+  lines.push(`  Legacy:          ${dollars(data.legacyReceiptsTotal)}`)
+  lines.push(`  AB:              ${dollars(data.abReceiptsTotal)}`)
+  lines.push(`  Combined:        ${dollars(data.combinedReceiptsTotal)}`)
+  lines.push(`  Target:          ${dollars(data.thisWeekProjectedTotal)}`)
+  lines.push(`  Var. from Target: ${varStr}`)
   lines.push('')
 
   // ── Projected Payments Summary (table by week) ───────────
