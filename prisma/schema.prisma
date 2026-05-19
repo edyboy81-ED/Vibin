@@ -27,14 +27,16 @@ model Job {
 }
 
 model Payment {
-  id              String    @id @default(cuid())
+  id              String            @id @default(cuid())
   jobId           String
-  job             Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job             Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  projectionId    String?
+  projection      ProjectedPayment? @relation(fields: [projectionId], references: [id], onDelete: SetNull)
   datePmtReceived DateTime
-  amountReceived  Int       // cents
+  amountReceived  Int               // cents
   paidThruDate    DateTime?
   notes           String?
-  createdAt       DateTime  @default(now())
+  createdAt       DateTime          @default(now())
 }
 
 model ProjectionStatus {
@@ -70,6 +72,7 @@ model ProjectedPayment {
 
   notes     ProjectionNote[]
   movements ProjectionMovement[]
+  payments  Payment[]
 }
 
 model ProjectionNote {

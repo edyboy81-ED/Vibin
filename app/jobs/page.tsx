@@ -22,6 +22,7 @@ interface PaymentRow {
   amountReceived: number
   paidThruDate: string | null
   notes: string | null
+  projection: { estimateNumber: string } | null
   job: {
     id: string
     jobNumber: string
@@ -351,8 +352,8 @@ function JobsContent() {
                           <td className="px-4 py-2.5 text-xs text-gray-400 font-mono" />
                           <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(p.datePmtReceived)}</td>
                           <td className="px-4 py-2.5" />
+                          <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{p.projection?.estimateNumber ?? '—'}</td>
                           <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">{p.paidThruDate ? `Paid thru ${fmtDate(p.paidThruDate)}` : ''}</td>
-                          <td className="px-4 py-2.5" />
                           <td className="px-4 py-2.5 font-mono text-sm font-medium whitespace-nowrap">{dollars(p.amountReceived)}</td>
                           <td className="px-4 py-2.5 text-right text-xs text-gray-400">{p.notes || ''}</td>
                         </tr>
@@ -370,6 +371,7 @@ function JobsContent() {
                   <Th>Job Name</Th>
                   <Th>Company</Th>
                   <Th>Status</Th>
+                  <Th>Est #</Th>
                   <Th>Date Received</Th>
                   <Th>Amount</Th>
                   <Th>Paid Thru</Th>
@@ -378,9 +380,9 @@ function JobsContent() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {loading ? (
-                  <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No payments found.</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">No payments found.</td></tr>
                 ) : filtered.map(p => (
                   <tr
                     key={p.id}
@@ -399,6 +401,7 @@ function JobsContent() {
                     <td className="px-4 py-3">
                       <StatusBadge status={p.job.jobStatus} />
                     </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{p.projection?.estimateNumber ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDate(p.datePmtReceived)}</td>
                     <td className="px-4 py-3 font-mono font-medium whitespace-nowrap">{dollars(p.amountReceived)}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{p.paidThruDate ? fmtDate(p.paidThruDate) : '—'}</td>

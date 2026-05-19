@@ -43,6 +43,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     prisma.payment.create({
       data: {
         jobId: projection.jobId,
+        projectionId: id,
         datePmtReceived: new Date(datePmtReceived),
         amountReceived: amountCents,
       },

@@ -17,6 +17,7 @@ export async function GET() {
           _count: { select: { projections: true } },
         },
       },
+      projection: { select: { estimateNumber: true } },
     },
   })
   return NextResponse.json(payments)
