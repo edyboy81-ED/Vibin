@@ -2,9 +2,22 @@
 
 import { useState } from 'react'
 
-const VERSION = 'v1.4.0'
+const VERSION = 'v1.5.0'
 
 const CHANGELOG = [
+  {
+    version: 'v1.5.0',
+    date: 'May 19, 2026',
+    title: 'Cash Receipts & Report Insights',
+    changes: [
+      'Cash Receipts — Group by Job toggle collapses payments into expandable job rows showing payment count and total received',
+      'Cash Receipts — Est # column shows the projection estimate number linked to each payment (populated on new payments via Post Payment)',
+      'Friday Report — Variance from Target KPI compares combined receipts to the week\'s projected target with dollar and percentage variance',
+      'Friday Report — Variance Breakdown section explains what drove the variance: Moved to Future Date, Still Expected This Week, Partial Payments Received, and Unplanned Receipts',
+      'Friday Report — Target calculation now correctly includes projections moved out of the week, not just those currently scheduled',
+      'Variance Breakdown included in the generated email body for leadership visibility',
+    ],
+  },
   {
     version: 'v1.4.0',
     date: 'May 11, 2026',
