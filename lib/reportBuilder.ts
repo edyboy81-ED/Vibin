@@ -52,13 +52,42 @@ export interface UnplannedReceiptRow {
   amountReceived: number
 }
 
+export interface MovedOutRow {
+  jobNumber: string
+  jobName: string
+  estimateNumber: string
+  estimatedAmountOwed: number
+  originalDate: string
+  newDate: string
+  reason: string
+}
+
+export interface DueNotReceivedRow {
+  jobNumber: string
+  jobName: string
+  estimateNumber: string
+  estimatedAmountOwed: number
+  scheduledDate: string
+  statusName: string
+  notes: string
+}
+
+export interface PartiallyReceivedRow {
+  jobNumber: string
+  jobName: string
+  estimateNumber: string
+  estimatedAmountOwed: number
+  scheduledDate: string
+  notes: string
+}
+
 export interface ReportData {
   reportDate: Date
   // Cash receipts this week
   legacyReceiptsTotal: number
   abReceiptsTotal: number
   combinedReceiptsTotal: number
-  // This week's projected target (all projections due this week)
+  // This week's projected target (projections due this week + moved-out projections)
   thisWeekProjectedTotal: number
   // Projections
   nextWeekSections: ReportSection[]
@@ -67,6 +96,10 @@ export interface ReportData {
   lastWeekStatus: LastWeekStatusRow[]
   // Unplanned receipts
   unplannedReceipts: UnplannedReceiptRow[]
+  // Variance insight buckets
+  movedOut: MovedOutRow[]
+  dueNotReceived: DueNotReceivedRow[]
+  partiallyReceived: PartiallyReceivedRow[]
 }
 
 export async function buildReport(reportDate: Date): Promise<ReportData> {
@@ -89,14 +122,29 @@ export async function buildReport(reportDate: Date): Promise<ReportData> {
   const lastWeekEnd = utcEndOfDay(utcAddDays(friday, -7))
 
   // --- Cash receipts this week ---
-  const [weekPayments, thisWeekProjections] = await Promise.all([
+  const [weekPayments, currentWeekProjections, weekMovements] = await Promise.all([
     prisma.payment.findMany({
       where: { datePmtReceived: { gte: weekStart, lte: weekEnd } },
       include: { job: { select: { division: true, jobNumber: true, jobName: true } } },
     }),
     prisma.projectedPayment.findMany({
       where: { estimatedPaymentDate: { gte: weekStart, lte: weekEnd }, isActive: true },
-      select: { estimatedAmountOwed: true },
+      include: {
+        status: true,
+        notes: { orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+    }),
+    prisma.projectionMovement.findMany({
+      where: { fromDate: { gte: weekStart, lte: weekEnd } },
+      include: {
+        projection: {
+          include: {
+            status: true,
+            notes: { orderBy: { createdAt: 'desc' }, take: 1 },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
     }),
   ])
 
@@ -106,6 +154,53 @@ export async function buildReport(reportDate: Date): Promise<ReportData> {
   const abReceiptsTotal = weekPayments
     .filter(p => p.job.division === 'AB')
     .reduce((s, p) => s + p.amountReceived, 0)
+
+  // --- Target calculation: current week projections + moved-out projections ---
+  const currentWeekIdSet = new Set(currentWeekProjections.map(p => p.id))
+  // Most recent movement per projection that moved it OUT of this week
+  const movedOutByProjection = new Map<string, (typeof weekMovements)[0]>()
+  for (const m of weekMovements) {
+    if (!currentWeekIdSet.has(m.projectionId) && !movedOutByProjection.has(m.projectionId)) {
+      movedOutByProjection.set(m.projectionId, m)
+    }
+  }
+  const thisWeekProjectedTotal =
+    currentWeekProjections.reduce((s, p) => s + p.estimatedAmountOwed, 0) +
+    Array.from(movedOutByProjection.values()).reduce((s, m) => s + m.projection.estimatedAmountOwed, 0)
+
+  // --- Variance insight buckets ---
+  const movedOut: MovedOutRow[] = Array.from(movedOutByProjection.values()).map(m => ({
+    jobNumber: m.projection.jobNumber,
+    jobName: m.projection.jobName,
+    estimateNumber: m.projection.estimateNumber,
+    estimatedAmountOwed: m.projection.estimatedAmountOwed,
+    originalDate: fmtDate(m.fromDate),
+    newDate: fmtDate(m.toDate),
+    reason: m.reason ?? '',
+  }))
+
+  const dueNotReceived: DueNotReceivedRow[] = currentWeekProjections
+    .filter(p => !['received', 'partial'].includes(p.status.name.toLowerCase()))
+    .map(p => ({
+      jobNumber: p.jobNumber,
+      jobName: p.jobName,
+      estimateNumber: p.estimateNumber,
+      estimatedAmountOwed: p.estimatedAmountOwed,
+      scheduledDate: fmtDate(p.estimatedPaymentDate),
+      statusName: p.status.name,
+      notes: p.notes[0]?.content ?? '',
+    }))
+
+  const partiallyReceived: PartiallyReceivedRow[] = currentWeekProjections
+    .filter(p => p.status.name.toLowerCase() === 'partial')
+    .map(p => ({
+      jobNumber: p.jobNumber,
+      jobName: p.jobName,
+      estimateNumber: p.estimateNumber,
+      estimatedAmountOwed: p.estimatedAmountOwed,
+      scheduledDate: fmtDate(p.estimatedPaymentDate),
+      notes: p.notes[0]?.content ?? '',
+    }))
 
   // --- Projections: next week ---
   const nextWeekProjections = await prisma.projectedPayment.findMany({
@@ -156,7 +251,7 @@ export async function buildReport(reportDate: Date): Promise<ReportData> {
     legacyReceiptsTotal,
     abReceiptsTotal,
     combinedReceiptsTotal: legacyReceiptsTotal + abReceiptsTotal,
-    thisWeekProjectedTotal: thisWeekProjections.reduce((s, p) => s + p.estimatedAmountOwed, 0),
+    thisWeekProjectedTotal,
     nextWeekSections: groupByDate(nextWeekProjections),
     futureSections: groupByDate(futureProjections),
     lastWeekStatus: lastWeekProjections.map(p => ({
@@ -178,6 +273,9 @@ export async function buildReport(reportDate: Date): Promise<ReportData> {
       datePmtReceived: fmtDate(p.datePmtReceived),
       amountReceived: p.amountReceived,
     })),
+    movedOut,
+    dueNotReceived,
+    partiallyReceived,
   }
 }
 
@@ -240,12 +338,63 @@ export function generateEmailBody(data: ReportData): string {
     ? `${varSign}${dollars(Math.abs(variance))} / ${varSign}${pct!.toFixed(1)}%`
     : 'N/A (no projections for this week)'
 
-  lines.push(`  Legacy:          ${dollars(data.legacyReceiptsTotal)}`)
-  lines.push(`  AB:              ${dollars(data.abReceiptsTotal)}`)
-  lines.push(`  Combined:        ${dollars(data.combinedReceiptsTotal)}`)
-  lines.push(`  Target:          ${dollars(data.thisWeekProjectedTotal)}`)
+  lines.push(`  Legacy:           ${dollars(data.legacyReceiptsTotal)}`)
+  lines.push(`  AB:               ${dollars(data.abReceiptsTotal)}`)
+  lines.push(`  Combined:         ${dollars(data.combinedReceiptsTotal)}`)
+  lines.push(`  Target:           ${dollars(data.thisWeekProjectedTotal)}`)
   lines.push(`  Var. from Target: ${varStr}`)
   lines.push('')
+
+  // ── Variance Breakdown ───────────────────────────────────
+  const hasInsights =
+    data.movedOut.length > 0 ||
+    data.dueNotReceived.length > 0 ||
+    data.partiallyReceived.length > 0 ||
+    data.unplannedReceipts.length > 0
+  if (hasInsights) {
+    lines.push(div)
+    lines.push('VARIANCE FROM TARGET — BREAKDOWN')
+    lines.push(div)
+
+    if (data.movedOut.length > 0) {
+      const movedTotal = data.movedOut.reduce((s, r) => s + r.estimatedAmountOwed, 0)
+      lines.push(`  Moved to a Future Date  (-${dollars(movedTotal)}):`)
+      for (const r of data.movedOut) {
+        const reason = r.reason.trim() ? r.reason : 'no reason given'
+        lines.push(`    • ${r.jobNumber} – ${r.jobName}  |  Est #${r.estimateNumber}  |  ${dollars(r.estimatedAmountOwed)}  →  ${r.newDate} (${reason})`)
+      }
+      lines.push('')
+    }
+
+    if (data.dueNotReceived.length > 0) {
+      const dueTotal = data.dueNotReceived.reduce((s, r) => s + r.estimatedAmountOwed, 0)
+      lines.push(`  Still Expected This Week  (-${dollars(dueTotal)}):`)
+      for (const r of data.dueNotReceived) {
+        lines.push(`    • ${r.jobNumber} – ${r.jobName}  |  Est #${r.estimateNumber}  |  ${dollars(r.estimatedAmountOwed)}  (${r.statusName})`)
+        if (r.notes.trim()) lines.push(`      ${r.notes}`)
+      }
+      lines.push('')
+    }
+
+    if (data.partiallyReceived.length > 0) {
+      const partialTotal = data.partiallyReceived.reduce((s, r) => s + r.estimatedAmountOwed, 0)
+      lines.push(`  Partial Payments Received  (-${dollars(partialTotal)} remaining):`)
+      for (const r of data.partiallyReceived) {
+        lines.push(`    • ${r.jobNumber} – ${r.jobName}  |  Est #${r.estimateNumber}  |  ${dollars(r.estimatedAmountOwed)} remaining`)
+        if (r.notes.trim()) lines.push(`      ${r.notes}`)
+      }
+      lines.push('')
+    }
+
+    if (data.unplannedReceipts.length > 0) {
+      const unplannedTotal = data.unplannedReceipts.reduce((s, r) => s + r.amountReceived, 0)
+      lines.push(`  Unplanned Receipts  (+${dollars(unplannedTotal)}):`)
+      for (const r of data.unplannedReceipts) {
+        lines.push(`    • ${r.jobNumber} – ${r.jobName}  |  received ${r.datePmtReceived}  |  ${dollars(r.amountReceived)}`)
+      }
+      lines.push('')
+    }
+  }
 
   // ── Projected Payments Summary (table by week) ───────────
   lines.push(div)

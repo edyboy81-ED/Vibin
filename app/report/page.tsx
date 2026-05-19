@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { dollars, fmtDate, nextFriday, toDateInput } from '@/lib/format'
-import type { ReportData, ReportSection, LastWeekStatusRow, UnplannedReceiptRow } from '@/lib/reportBuilder'
+import type { ReportData, ReportSection, LastWeekStatusRow, UnplannedReceiptRow, MovedOutRow, DueNotReceivedRow, PartiallyReceivedRow } from '@/lib/reportBuilder'
 
 interface ReportResponse extends Omit<ReportData, 'reportDate'> {
   reportDate: string
@@ -125,6 +125,16 @@ export default function ReportPage() {
             <SummaryCard label="This Week's Target" value={dollars(data.thisWeekProjectedTotal)} color="text-orange-700" />
             <VarianceCard actual={data.combinedReceiptsTotal} target={data.thisWeekProjectedTotal} />
           </div>
+
+          {/* Variance insight breakdown */}
+          {(data.movedOut.length > 0 || data.dueNotReceived.length > 0 || data.partiallyReceived.length > 0 || data.unplannedReceipts.length > 0) && (
+            <VarianceInsights
+              movedOut={data.movedOut}
+              dueNotReceived={data.dueNotReceived}
+              partiallyReceived={data.partiallyReceived}
+              unplannedReceipts={data.unplannedReceipts}
+            />
+          )}
 
           {/* Next week projections */}
           {data.nextWeekSections.length > 0 && (
@@ -313,6 +323,187 @@ function LastWeekTable({ rows }: { rows: LastWeekStatusRow[] }) {
         ))}
       </tbody>
     </table>
+  )
+}
+
+function VarianceInsights({
+  movedOut, dueNotReceived, partiallyReceived, unplannedReceipts,
+}: {
+  movedOut: MovedOutRow[]
+  dueNotReceived: DueNotReceivedRow[]
+  partiallyReceived: PartiallyReceivedRow[]
+  unplannedReceipts: UnplannedReceiptRow[]
+}) {
+  const movedTotal = movedOut.reduce((s, r) => s + r.estimatedAmountOwed, 0)
+  const dueTotal = dueNotReceived.reduce((s, r) => s + r.estimatedAmountOwed, 0)
+  const partialTotal = partiallyReceived.reduce((s, r) => s + r.estimatedAmountOwed, 0)
+  const unplannedTotal = unplannedReceipts.reduce((s, r) => s + r.amountReceived, 0)
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4 break-inside-avoid print:hidden">
+      <h2 className="font-semibold text-gray-900 mb-4">Variance from Target — Breakdown</h2>
+      <div className="space-y-4">
+        {movedOut.length > 0 && (
+          <InsightBucket
+            title="Moved to a Future Date"
+            amount={-movedTotal}
+            color="red"
+          >
+            <table className="w-full text-xs mt-2">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Job #</th>
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Est #</th>
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Amount</th>
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Moved To</th>
+                  <th className="pb-1 text-left font-medium text-gray-400 uppercase tracking-wide">Reason</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {movedOut.map((r, i) => (
+                  <tr key={i}>
+                    <td className="py-1.5 pr-3 font-mono whitespace-nowrap">{r.jobNumber}</td>
+                    <td className="py-1.5 pr-3 text-gray-700">{r.jobName}</td>
+                    <td className="py-1.5 pr-3 text-gray-500 whitespace-nowrap">{r.estimateNumber}</td>
+                    <td className="py-1.5 pr-3 font-mono whitespace-nowrap text-red-600">{dollars(r.estimatedAmountOwed)}</td>
+                    <td className="py-1.5 pr-3 text-gray-500 whitespace-nowrap">{r.newDate}</td>
+                    <td className="py-1.5 text-gray-400 italic">{r.reason.trim() || 'no reason given'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </InsightBucket>
+        )}
+
+        {dueNotReceived.length > 0 && (
+          <InsightBucket
+            title="Still Expected This Week"
+            amount={-dueTotal}
+            color="orange"
+          >
+            <table className="w-full text-xs mt-2">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Job #</th>
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Est #</th>
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Amount</th>
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Sched.</th>
+                  <th className="pb-1 text-left font-medium text-gray-400 uppercase tracking-wide">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {dueNotReceived.map((r, i) => (
+                  <tr key={i}>
+                    <td className="py-1.5 pr-3 font-mono whitespace-nowrap">{r.jobNumber}</td>
+                    <td className="py-1.5 pr-3 text-gray-700">{r.jobName}</td>
+                    <td className="py-1.5 pr-3 text-gray-500 whitespace-nowrap">{r.estimateNumber}</td>
+                    <td className="py-1.5 pr-3 font-mono whitespace-nowrap text-orange-600">{dollars(r.estimatedAmountOwed)}</td>
+                    <td className="py-1.5 pr-3 text-gray-500 whitespace-nowrap">{r.scheduledDate}</td>
+                    <td className="py-1.5 text-gray-500 whitespace-nowrap">{r.statusName}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </InsightBucket>
+        )}
+
+        {partiallyReceived.length > 0 && (
+          <InsightBucket
+            title="Partial Payments Received"
+            amount={-partialTotal}
+            color="orange"
+            amountLabel="remaining"
+          >
+            <table className="w-full text-xs mt-2">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Job #</th>
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Est #</th>
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Remaining</th>
+                  <th className="pb-1 text-left font-medium text-gray-400 uppercase tracking-wide">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {partiallyReceived.map((r, i) => (
+                  <tr key={i}>
+                    <td className="py-1.5 pr-3 font-mono whitespace-nowrap">{r.jobNumber}</td>
+                    <td className="py-1.5 pr-3 text-gray-700">{r.jobName}</td>
+                    <td className="py-1.5 pr-3 text-gray-500 whitespace-nowrap">{r.estimateNumber}</td>
+                    <td className="py-1.5 pr-3 font-mono whitespace-nowrap text-orange-600">{dollars(r.estimatedAmountOwed)}</td>
+                    <td className="py-1.5 text-gray-400">{r.notes || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </InsightBucket>
+        )}
+
+        {unplannedReceipts.length > 0 && (
+          <InsightBucket
+            title="Unplanned Receipts"
+            amount={unplannedTotal}
+            color="green"
+          >
+            <table className="w-full text-xs mt-2">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Job #</th>
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Division</th>
+                  <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Date</th>
+                  <th className="pb-1 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {unplannedReceipts.map((r, i) => (
+                  <tr key={i}>
+                    <td className="py-1.5 pr-3 font-mono whitespace-nowrap">{r.jobNumber}</td>
+                    <td className="py-1.5 pr-3 text-gray-700">{r.jobName}</td>
+                    <td className="py-1.5 pr-3 text-gray-500 whitespace-nowrap">{r.division}</td>
+                    <td className="py-1.5 pr-3 text-gray-500 whitespace-nowrap">{r.datePmtReceived}</td>
+                    <td className="py-1.5 font-mono whitespace-nowrap text-green-600">{dollars(r.amountReceived)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </InsightBucket>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function InsightBucket({
+  title, amount, color, amountLabel, children,
+}: {
+  title: string
+  amount: number
+  color: 'red' | 'orange' | 'green'
+  amountLabel?: string
+  children: React.ReactNode
+}) {
+  const colorMap = {
+    red: { badge: 'bg-red-50 text-red-700 border-red-200', bar: 'bg-red-400' },
+    orange: { badge: 'bg-orange-50 text-orange-700 border-orange-200', bar: 'bg-orange-400' },
+    green: { badge: 'bg-green-50 text-green-700 border-green-200', bar: 'bg-green-400' },
+  }
+  const c = colorMap[color]
+  const sign = amount > 0 ? '+' : ''
+  const amtStr = `${sign}${dollars(Math.abs(amount))}${amountLabel ? ' ' + amountLabel : ''}`
+  return (
+    <div className="border border-gray-100 rounded-lg overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <div className={`w-1.5 h-4 rounded-full ${c.bar}`} />
+          <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">{title}</span>
+        </div>
+        <span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded border ${c.badge}`}>{amtStr}</span>
+      </div>
+      <div className="px-3 pb-3">{children}</div>
+    </div>
   )
 }
 
