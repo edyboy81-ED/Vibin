@@ -8,54 +8,81 @@ function formatMoney(cents: number): string {
 }
 
 export async function POST(req: NextRequest, { params }: Ctx) {
-  const { id } = await params
-  const { datePmtReceived, amountReceived } = await req.json()
+  try {
+    const { id } = await params
+    const { datePmtReceived, amountReceived } = await req.json()
 
-  if (!datePmtReceived || amountReceived == null) {
-    return NextResponse.json({ error: 'datePmtReceived and amountReceived are required' }, { status: 400 })
-  }
+    if (!datePmtReceived || amountReceived == null) {
+      return NextResponse.json({ error: 'datePmtReceived and amountReceived are required' }, { status: 400 })
+    }
 
-  const projection = await prisma.projectedPayment.findUnique({
-    where: { id },
-    include: { status: true },
-  })
-
-  if (!projection) return NextResponse.json({ error: 'Projection not found' }, { status: 404 })
-  if (!projection.jobId) return NextResponse.json({ error: 'This projection is not linked to a job.' }, { status: 422 })
-
-  const [receivedStatus, partialStatus] = await Promise.all([
-    prisma.projectionStatus.findFirst({ where: { name: 'Received' } }),
-    prisma.projectionStatus.findFirst({ where: { name: 'Partial' } }),
-  ])
-
-  if (!receivedStatus) return NextResponse.json({ error: '"Received" status not found. Add it in Settings.' }, { status: 422 })
-
-  const amountCents = Math.round(Number(amountReceived))
-  const currentBalance = projection.estimatedAmountOwed
-  const isFullyPaid = amountCents >= currentBalance
-  const remainingBalance = isFullyPaid ? 0 : currentBalance - amountCents
-
-  const noteContent = isFullyPaid
-    ? `[System] Payment of ${formatMoney(amountCents)} received. Projection fully paid.`
-    : `[System] Partial payment of ${formatMoney(amountCents)} received. Balance reduced from ${formatMoney(currentBalance)} to ${formatMoney(remainingBalance)}.`
-
-  await prisma.$transaction([
-    prisma.payment.create({
-      data: {
-        jobId: projection.jobId,
-        datePmtReceived: new Date(datePmtReceived),
-        amountReceived: amountCents,
-      },
-    }),
-    prisma.projectedPayment.update({
+    const projection = await prisma.projectedPayment.findUnique({
       where: { id },
-      data: {
-        statusId: isFullyPaid ? receivedStatus.id : (partialStatus?.id ?? receivedStatus.id),
-        estimatedAmountOwed: isFullyPaid ? currentBalance : remainingBalance,
-        notes: { create: [{ content: noteContent }] },
-      },
-    }),
-  ])
+      include: { status: true },
+    })
 
-  return NextResponse.json({ ok: true, isFullyPaid, remainingBalance })
+    if (!projection) return NextResponse.json({ error: 'Projection not found' }, { status: 404 })
+    if (!projection.jobId) return NextResponse.json({ error: 'This projection is not linked to a job.' }, { status: 422 })
+
+    const [receivedStatus, partialStatus] = await Promise.all([
+      prisma.projectionStatus.findFirst({ where: { name: { equals: 'Received', mode: 'insensitive' } } }),
+      prisma.projectionStatus.findFirst({ where: { name: { equals: 'Partial', mode: 'insensitive' } } }),
+    ])
+
+    if (!receivedStatus) return NextResponse.json({ error: '"Received" status not found. Add it in Settings.' }, { status: 422 })
+
+    const amountCents = Math.round(Number(amountReceived))
+    const currentBalance = projection.estimatedAmountOwed
+    const isFullyPaid = amountCents >= currentBalance
+    const remainingBalance = isFullyPaid ? 0 : currentBalance - amountCents
+
+    const noteContent = isFullyPaid
+      ? `[System] Payment of ${formatMoney(amountCents)} received. Projection fully paid.`
+      : `[System] Partial payment of ${formatMoney(amountCents)} received. Balance reduced from ${formatMoney(currentBalance)} to ${formatMoney(remainingBalance)}.`
+
+    // Try with projectionId link first; fall back if migration not yet applied
+    try {
+      await prisma.$transaction([
+        prisma.payment.create({
+          data: {
+            jobId: projection.jobId,
+            projectionId: id,
+            datePmtReceived: new Date(datePmtReceived),
+            amountReceived: amountCents,
+          },
+        }),
+        prisma.projectedPayment.update({
+          where: { id },
+          data: {
+            statusId: isFullyPaid ? receivedStatus.id : (partialStatus?.id ?? receivedStatus.id),
+            estimatedAmountOwed: isFullyPaid ? currentBalance : remainingBalance,
+            notes: { create: [{ content: noteContent }] },
+          },
+        }),
+      ])
+    } catch {
+      await prisma.$transaction([
+        prisma.payment.create({
+          data: {
+            jobId: projection.jobId,
+            datePmtReceived: new Date(datePmtReceived),
+            amountReceived: amountCents,
+          },
+        }),
+        prisma.projectedPayment.update({
+          where: { id },
+          data: {
+            statusId: isFullyPaid ? receivedStatus.id : (partialStatus?.id ?? receivedStatus.id),
+            estimatedAmountOwed: isFullyPaid ? currentBalance : remainingBalance,
+            notes: { create: [{ content: noteContent }] },
+          },
+        }),
+      ])
+    }
+
+    return NextResponse.json({ ok: true, isFullyPaid, remainingBalance })
+  } catch (err) {
+    console.error('post-payment error:', err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
 }
