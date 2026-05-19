@@ -352,7 +352,11 @@ function JobsContent() {
                           <td className="px-4 py-2.5 text-xs text-gray-400 font-mono" />
                           <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(p.datePmtReceived)}</td>
                           <td className="px-4 py-2.5" />
-                          <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{p.projection?.estimateNumber ?? '—'}</td>
+                          <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                            {p.projection?.estimateNumber
+                              ? <span><span className="text-gray-400">Est #</span> {p.projection.estimateNumber}</span>
+                              : '—'}
+                          </td>
                           <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">{p.paidThruDate ? `Paid thru ${fmtDate(p.paidThruDate)}` : ''}</td>
                           <td className="px-4 py-2.5 font-mono text-sm font-medium whitespace-nowrap">{dollars(p.amountReceived)}</td>
                           <td className="px-4 py-2.5 text-right text-xs text-gray-400">{p.notes || ''}</td>
