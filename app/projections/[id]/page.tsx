@@ -12,7 +12,11 @@ interface Projection {
   status: { id: string; name: string; color: string }
   notes: { id: string; content: string; createdAt: string }[]
   movements: { id: string; fromDate: string; toDate: string; reason: string | null; createdAt: string }[]
-  job: { id: string } | null
+  job: { id: string; jobNumber: string; jobName: string } | null
+}
+
+interface JobSearchResult {
+  id: string; jobNumber: string; jobName: string; company: string; division: string
 }
 
 interface Status { id: string; name: string; color: string }
@@ -25,6 +29,9 @@ export default function ProjectionDetailPage() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Record<string, string>>({})
+  const [jobSearch, setJobSearch] = useState('')
+  const [jobResults, setJobResults] = useState<JobSearchResult[]>([])
+  const [linkedJob, setLinkedJob] = useState<JobSearchResult | null>(null)
   const [saving, setSaving] = useState(false)
   const [newNote, setNewNote] = useState('')
   const [addingNote, setAddingNote] = useState(false)
@@ -62,15 +69,29 @@ export default function ProjectionDetailPage() {
   }, [proj])
 
   useEffect(() => {
-    if (proj) setEditForm({
-      monthYear: proj.monthYear,
-      estimateNumber: proj.estimateNumber,
-      billingPeriod: proj.billingPeriod,
-      estimatedAmountOwed: (proj.estimatedAmountOwed / 100).toFixed(2),
-      estimatedPaymentDate: toDateInput(proj.estimatedPaymentDate),
-      statusId: proj.status.id,
-    })
+    if (proj) {
+      setEditForm({
+        monthYear: proj.monthYear,
+        estimateNumber: proj.estimateNumber,
+        billingPeriod: proj.billingPeriod,
+        estimatedAmountOwed: (proj.estimatedAmountOwed / 100).toFixed(2),
+        estimatedPaymentDate: toDateInput(proj.estimatedPaymentDate),
+        statusId: proj.status.id,
+      })
+      setLinkedJob(proj.job ? { id: proj.job.id, jobNumber: proj.job.jobNumber, jobName: proj.job.jobName, company: '', division: '' } : null)
+      setJobSearch('')
+      setJobResults([])
+    }
   }, [proj])
+
+  useEffect(() => {
+    if (!jobSearch.trim()) { setJobResults([]); return }
+    const t = setTimeout(async () => {
+      const res = await fetch(`/api/jobs/search?q=${encodeURIComponent(jobSearch)}`)
+      setJobResults(await res.json())
+    }, 200)
+    return () => clearTimeout(t)
+  }, [jobSearch])
 
   const ef = (k: string, v: string) => setEditForm(f => ({ ...f, [k]: v }))
 
@@ -82,6 +103,7 @@ export default function ProjectionDetailPage() {
       body: JSON.stringify({
         ...editForm,
         estimatedAmountOwed: Math.round(parseFloat(editForm.estimatedAmountOwed) * 100),
+        jobId: linkedJob?.id ?? '',
       }),
     })
     setSaving(false)
@@ -221,6 +243,48 @@ export default function ProjectionDetailPage() {
                 <option value="false">Inactive</option>
               </select>
             </Field>
+            <div className="col-span-full">
+              <Field label="Linked Job">
+                {linkedJob ? (
+                  <div className="flex items-center gap-2">
+                    <span className="input flex-1 bg-gray-50 text-gray-700 cursor-default">
+                      {linkedJob.jobNumber} — {linkedJob.jobName}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setLinkedJob(null); setJobSearch('') }}
+                      className="text-xs text-red-500 hover:text-red-700 px-2 py-1 border border-red-200 rounded-lg"
+                    >
+                      Unlink
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input
+                      value={jobSearch}
+                      onChange={e => setJobSearch(e.target.value)}
+                      placeholder="Search by job # or name…"
+                      className="input w-full"
+                    />
+                    {jobResults.length > 0 && (
+                      <div className="absolute z-10 top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
+                        {jobResults.map(j => (
+                          <button
+                            key={j.id}
+                            type="button"
+                            onClick={() => { setLinkedJob(j); setJobSearch(''); setJobResults([]) }}
+                            className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm border-b border-gray-50 last:border-0"
+                          >
+                            <span className="font-mono text-xs font-medium text-gray-700">{j.jobNumber}</span>
+                            <span className="text-gray-500 ml-2">{j.jobName}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Field>
+            </div>
           </div>
         ) : (
           <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 text-sm">
