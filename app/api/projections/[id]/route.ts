@@ -23,7 +23,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   const body = await req.json()
   const {
     monthYear, estimateNumber, billingPeriod,
-    estimatedAmountOwed, estimatedPaymentDate, statusId, isActive,
+    estimatedAmountOwed, estimatedPaymentDate, statusId, isActive, jobId,
   } = body
 
   const projection = await prisma.projectedPayment.update({
@@ -36,6 +36,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
       estimatedPaymentDate: estimatedPaymentDate ? new Date(estimatedPaymentDate) : undefined,
       statusId: statusId ? String(statusId) : undefined,
       isActive: isActive !== undefined ? Boolean(isActive) : undefined,
+      jobId: jobId !== undefined ? (jobId || null) : undefined,
     },
     include: { status: true },
   })
