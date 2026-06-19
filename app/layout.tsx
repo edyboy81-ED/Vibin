@@ -40,7 +40,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main className="flex-1 p-6 max-w-screen-xl mx-auto w-full">{children}</main>
         <footer className="bg-slate-900 print:hidden">
           <div className="max-w-screen-xl mx-auto px-6 py-3 flex items-center justify-between">
-            <span className="text-xs text-slate-400">Vibin AR · v1.5.0</span>
+            <span className="text-xs text-slate-400">Vibin AR · v1.6.0</span>
             <WhatsNewModal />
           </div>
         </footer>

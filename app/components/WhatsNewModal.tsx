@@ -2,9 +2,19 @@
 
 import { useState } from 'react'
 
-const VERSION = 'v1.5.0'
+const VERSION = 'v1.6.0'
 
 const CHANGELOG = [
+  {
+    version: 'v1.6.0',
+    date: 'June 19, 2026',
+    title: 'Payment Editing & Audit Trail',
+    changes: [
+      'Payment History — payments can now be edited inline: date received, amount, paid thru date, and notes',
+      'Payment History — every edit is logged in an audit trail shown directly below the payment row with a timestamp and a description of what changed',
+      'Projections — Edit form now includes a Link to Job field, allowing unlinked projections to be associated with a job (required for Post Payment to work)',
+    ],
+  },
   {
     version: 'v1.5.0',
     date: 'May 19, 2026',
