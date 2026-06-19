@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { dollars, fmtDate, toDateInput, daysSince } from '@/lib/format'
 import { ALL_COMPANIES } from '@/lib/companies'
@@ -14,9 +14,14 @@ interface Job {
   projections: Projection[]
 }
 
+interface PaymentAuditLog {
+  id: string; changes: string; changedAt: string
+}
+
 interface Payment {
   id: string; datePmtReceived: string; amountReceived: number
   paidThruDate: string | null; notes: string | null; createdAt: string
+  auditLogs: PaymentAuditLog[]
 }
 
 interface Projection {
@@ -43,6 +48,8 @@ export default function JobDetailPage() {
   const [payResult, setPayResult] = useState<{ payment: { amountReceived: number }; activeProjections: Projection[] } | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
+  const [editPayForm, setEditPayForm] = useState({ datePmtReceived: '', amountReceived: '', paidThruDate: '', notes: '' })
 
   // Banner state
   const [bannerApplied, setBannerApplied] = useState<Record<string, boolean>>({})
@@ -132,6 +139,34 @@ export default function JobDetailPage() {
   const handleDeletePayment = async (paymentId: string) => {
     if (!confirm('Delete this payment? This cannot be undone.')) return
     await fetch(`/api/payments/${paymentId}`, { method: 'DELETE' })
+    fetchJob()
+  }
+
+  const startEditPayment = (p: Payment) => {
+    setEditingPaymentId(p.id)
+    setEditPayForm({
+      datePmtReceived: toDateInput(p.datePmtReceived),
+      amountReceived: (p.amountReceived / 100).toFixed(2),
+      paidThruDate: toDateInput(p.paidThruDate),
+      notes: p.notes ?? '',
+    })
+  }
+
+  const handleSavePayment = async () => {
+    if (!editingPaymentId) return
+    setSaving(true)
+    await fetch(`/api/payments/${editingPaymentId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        datePmtReceived: editPayForm.datePmtReceived,
+        amountReceived: Math.round(parseFloat(editPayForm.amountReceived) * 100),
+        paidThruDate: editPayForm.paidThruDate || null,
+        notes: editPayForm.notes || null,
+      }),
+    })
+    setSaving(false)
+    setEditingPaymentId(null)
     fetchJob()
   }
 
@@ -308,22 +343,57 @@ export default function JobDetailPage() {
               const daysBetween = prev
                 ? Math.floor((new Date(p.datePmtReceived).getTime() - new Date(prev.datePmtReceived).getTime()) / 86_400_000)
                 : daysSince(p.datePmtReceived)
+              const isEditing = editingPaymentId === p.id
+              if (isEditing) {
+                return (
+                  <tr key={p.id} className="bg-blue-50/40">
+                    <td className="py-2 px-2">
+                      <input type="date" value={editPayForm.datePmtReceived} onChange={e => setEditPayForm(f => ({ ...f, datePmtReceived: e.target.value }))} className="input text-xs w-full" />
+                    </td>
+                    <td className="py-2 px-2">
+                      <input type="number" step="0.01" min="0" value={editPayForm.amountReceived} onChange={e => setEditPayForm(f => ({ ...f, amountReceived: e.target.value }))} className="input text-xs w-full font-mono" />
+                    </td>
+                    <td className="py-2 px-2">
+                      <input type="date" value={editPayForm.paidThruDate} onChange={e => setEditPayForm(f => ({ ...f, paidThruDate: e.target.value }))} className="input text-xs w-full" />
+                    </td>
+                    <td className="py-2 px-2 text-gray-400 text-xs">{daysBetween ?? '—'}</td>
+                    <td className="py-2 px-2">
+                      <input value={editPayForm.notes} onChange={e => setEditPayForm(f => ({ ...f, notes: e.target.value }))} className="input text-xs w-full" placeholder="Notes" />
+                    </td>
+                    <td className="py-2 px-2 text-right whitespace-nowrap">
+                      <button onClick={handleSavePayment} disabled={saving} className="text-xs text-white bg-slate-900 px-2 py-1 rounded hover:bg-slate-700 disabled:opacity-50 mr-1">
+                        {saving ? '…' : 'Save'}
+                      </button>
+                      <button onClick={() => setEditingPaymentId(null)} className="text-xs text-gray-400 hover:text-gray-600">
+                        Cancel
+                      </button>
+                    </td>
+                  </tr>
+                )
+              }
               return (
-                <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="py-3 px-3">{fmtDate(p.datePmtReceived)}</td>
-                  <td className="py-3 px-3 font-mono">{dollars(p.amountReceived)}</td>
-                  <td className="py-3 px-3 text-gray-500">{fmtDate(p.paidThruDate)}</td>
-                  <td className="py-3 px-3 text-gray-500">{daysBetween ?? '—'}</td>
-                  <td className="py-3 px-3 text-gray-500 text-xs truncate">{p.notes ?? '—'}</td>
-                  <td className="py-3 px-3 text-right">
-                    <button
-                      onClick={() => handleDeletePayment(p.id)}
-                      className="text-xs text-red-400 hover:text-red-600"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
+                <React.Fragment key={p.id}>
+                  <tr className="hover:bg-gray-50">
+                    <td className="py-3 px-3">{fmtDate(p.datePmtReceived)}</td>
+                    <td className="py-3 px-3 font-mono">{dollars(p.amountReceived)}</td>
+                    <td className="py-3 px-3 text-gray-500">{fmtDate(p.paidThruDate)}</td>
+                    <td className="py-3 px-3 text-gray-500">{daysBetween ?? '—'}</td>
+                    <td className="py-3 px-3 text-gray-500 text-xs truncate">{p.notes ?? '—'}</td>
+                    <td className="py-3 px-3 text-right whitespace-nowrap">
+                      <button onClick={() => startEditPayment(p)} className="text-xs text-blue-500 hover:text-blue-700 mr-2">Edit</button>
+                      <button onClick={() => handleDeletePayment(p.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                    </td>
+                  </tr>
+                  {p.auditLogs.map(log => (
+                    <tr key={log.id} className="bg-amber-50/40">
+                      <td colSpan={6} className="py-1 px-4 text-xs text-amber-700">
+                        <span className="text-amber-400 mr-2">✎</span>
+                        <span className="text-amber-500 mr-2">{new Date(log.changedAt).toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit', hour: 'numeric', minute: '2-digit' })}</span>
+                        {log.changes}
+                      </td>
+                    </tr>
+                  ))}
+                </React.Fragment>
               )
             })}
           </tbody>

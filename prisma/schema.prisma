@@ -37,6 +37,16 @@ model Payment {
   paidThruDate    DateTime?
   notes           String?
   createdAt       DateTime          @default(now())
+
+  auditLogs PaymentAuditLog[]
+}
+
+model PaymentAuditLog {
+  id        String   @id @default(cuid())
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  changes   String
+  changedAt DateTime @default(now())
 }
 
 model ProjectionStatus {
