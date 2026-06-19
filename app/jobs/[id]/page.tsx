@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { dollars, fmtDate, toDateInput, daysSince } from '@/lib/format'
 import { ALL_COMPANIES } from '@/lib/companies'
@@ -14,9 +14,14 @@ interface Job {
   projections: Projection[]
 }
 
+interface PaymentAuditLog {
+  id: string; changes: string; changedAt: string
+}
+
 interface Payment {
   id: string; datePmtReceived: string; amountReceived: number
   paidThruDate: string | null; notes: string | null; createdAt: string
+  auditLogs: PaymentAuditLog[]
 }
 
 interface Projection {
@@ -367,17 +372,28 @@ export default function JobDetailPage() {
                 )
               }
               return (
-                <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="py-3 px-3">{fmtDate(p.datePmtReceived)}</td>
-                  <td className="py-3 px-3 font-mono">{dollars(p.amountReceived)}</td>
-                  <td className="py-3 px-3 text-gray-500">{fmtDate(p.paidThruDate)}</td>
-                  <td className="py-3 px-3 text-gray-500">{daysBetween ?? '—'}</td>
-                  <td className="py-3 px-3 text-gray-500 text-xs truncate">{p.notes ?? '—'}</td>
-                  <td className="py-3 px-3 text-right whitespace-nowrap">
-                    <button onClick={() => startEditPayment(p)} className="text-xs text-blue-500 hover:text-blue-700 mr-2">Edit</button>
-                    <button onClick={() => handleDeletePayment(p.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
-                  </td>
-                </tr>
+                <React.Fragment key={p.id}>
+                  <tr className="hover:bg-gray-50">
+                    <td className="py-3 px-3">{fmtDate(p.datePmtReceived)}</td>
+                    <td className="py-3 px-3 font-mono">{dollars(p.amountReceived)}</td>
+                    <td className="py-3 px-3 text-gray-500">{fmtDate(p.paidThruDate)}</td>
+                    <td className="py-3 px-3 text-gray-500">{daysBetween ?? '—'}</td>
+                    <td className="py-3 px-3 text-gray-500 text-xs truncate">{p.notes ?? '—'}</td>
+                    <td className="py-3 px-3 text-right whitespace-nowrap">
+                      <button onClick={() => startEditPayment(p)} className="text-xs text-blue-500 hover:text-blue-700 mr-2">Edit</button>
+                      <button onClick={() => handleDeletePayment(p.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                    </td>
+                  </tr>
+                  {p.auditLogs.map(log => (
+                    <tr key={log.id} className="bg-amber-50/40">
+                      <td colSpan={6} className="py-1 px-4 text-xs text-amber-700">
+                        <span className="text-amber-400 mr-2">✎</span>
+                        <span className="text-amber-500 mr-2">{new Date(log.changedAt).toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit', hour: 'numeric', minute: '2-digit' })}</span>
+                        {log.changes}
+                      </td>
+                    </tr>
+                  ))}
+                </React.Fragment>
               )
             })}
           </tbody>

@@ -9,7 +9,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const job = await prisma.job.findUnique({
     where: { id },
     include: {
-      payments: { orderBy: { datePmtReceived: 'desc' } },
+      payments: {
+        orderBy: { datePmtReceived: 'desc' },
+        include: { auditLogs: { orderBy: { changedAt: 'asc' } } },
+      },
       projections: {
         where: { isActive: true },
         include: { status: true },
