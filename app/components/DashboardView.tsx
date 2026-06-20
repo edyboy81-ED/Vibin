@@ -163,19 +163,19 @@ export default function DashboardView({ data: d }: { data: DashboardData }) {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-8">
         <div>
-          <h1 className={`text-3xl font-bold tracking-tight ${t.heading}`}>Dashboard</h1>
+          <h1 className={`text-2xl sm:text-3xl font-bold tracking-tight ${t.heading}`}>Dashboard</h1>
           <p className={`text-sm mt-1 ${t.subheading}`}>Next Friday report: {fmtDate(d.friday)}</p>
         </div>
-        <Link href="/report" className={`px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition-colors ${t.button}`}>
+        <Link href="/report" className={`self-start px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition-colors ${t.button}`}>
           Build Friday Report →
         </Link>
       </div>
 
       {/* This week's cash receipts */}
       <SectionHeader label="This Week's Cash Receipts" t={t} />
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <KpiCard label="Legacy" value={dollars(d.weekLegacy)} sub={`${d.weekLegacyCount} jobs`} valueClass={t.receiptValue} href={`/jobs?division=LEGACY&dateFrom=${d.dateFrom}&dateTo=${d.dateTo}`} t={t} />
         <KpiCard label="AB" value={dollars(d.weekAB)} sub={`${d.weekABCount} jobs`} valueClass={t.receiptValue} href={`/jobs?division=AB&dateFrom=${d.dateFrom}&dateTo=${d.dateTo}`} t={t} />
         <KpiCard label="Combined" value={dollars(d.weekLegacy + d.weekAB)} sub={`${d.weekTotalCount} jobs`} valueClass={t.combinedValue} href={`/jobs?dateFrom=${d.dateFrom}&dateTo=${d.dateTo}`} t={t} highlight />
@@ -183,7 +183,7 @@ export default function DashboardView({ data: d }: { data: DashboardData }) {
 
       {/* Projected payments */}
       <SectionHeader label="Projected Payments" t={t} />
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         <KpiCard label="Next Week" value={dollars(d.nextWeekTotal)} sub={`${d.nextWeekCount} projections`} valueClass={t.nextWeekValue} href={`/projections?dateFrom=${d.nextWeekMonStr}&dateTo=${d.nextWeekFriStr}&excludeStatus=received`} t={t} />
         <KpiCard label="Future" value={dollars(d.futureTotal)} sub={`${d.futureCount} projections`} valueClass={t.futureValue} href={`/projections?dateFrom=${d.afterNextWeekFriStr}&excludeStatus=received`} t={t} />
         <KpiCard label="Projected" value={d.projectedCount.toString()} sub="awaiting payment" valueClass={t.projectedValue} href="/projections?statusName=Projected" t={t} />

@@ -123,9 +123,9 @@ function JobsContent() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <h1 className="text-2xl font-bold text-gray-900">Cash Receipts</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/import" className="text-sm border border-gray-300 bg-white px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
             Import CSV
           </Link>
@@ -185,18 +185,18 @@ function JobsContent() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search job #, name, or customer…"
-          className="input flex-1 min-w-48"
+          className="input flex-1 min-w-0"
         />
-        <select value={filterDivision} onChange={e => setFilterDivision(e.target.value)} className="input w-36">
+        <select value={filterDivision} onChange={e => setFilterDivision(e.target.value)} className="input w-full sm:w-36">
           <option value="">All Divisions</option>
           <option value="LEGACY">Legacy</option>
           <option value="AB">AB</option>
         </select>
-        <select value={filterCompany} onChange={e => setFilterCompany(e.target.value)} className="input w-56">
+        <select value={filterCompany} onChange={e => setFilterCompany(e.target.value)} className="input w-full sm:w-56">
           <option value="">All Companies</option>
           {ALL_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input w-36">
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input w-full sm:w-36">
           <option value="">All Statuses</option>
           <option value="IN_PROGRESS">In Progress</option>
           <option value="CLOSED">Closed</option>
@@ -206,12 +206,12 @@ function JobsContent() {
       {/* Date filter row */}
       <div className="flex gap-3 mb-4 flex-wrap items-center">
         <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Payment date from</label>
-          <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="input w-40" />
+          <label className="text-xs font-medium text-gray-500 whitespace-nowrap">From</label>
+          <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="input flex-1 sm:w-40" />
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-gray-500">to</label>
-          <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="input w-40" />
+          <label className="text-xs font-medium text-gray-500">To</label>
+          <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="input flex-1 sm:w-40" />
         </div>
         <button
           onClick={() => { const w = getThisWeek(); setFilterDateFrom(w.from); setFilterDateTo(w.to) }}
@@ -228,10 +228,10 @@ function JobsContent() {
             onClick={() => { setFilterDateFrom(''); setFilterDateTo('') }}
             className="text-xs text-gray-400 hover:text-gray-600 underline"
           >
-            Clear dates
+            Clear
           </button>
         )}
-        <div className="flex items-center gap-1 ml-auto">
+        <div className="flex items-center gap-1 sm:ml-auto">
           {(['', 'LEGACY', 'AB'] as const).map(d => (
             <button
               key={d}
@@ -276,157 +276,245 @@ function JobsContent() {
             <span className="font-mono font-semibold text-gray-700">{dollars(filteredTotal)}</span>
           )}
         </div>
-        <div className="overflow-x-auto">
-          {groupByJob ? (
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <Th></Th>
-                  <Th>Job #</Th>
-                  <Th>Job Name</Th>
-                  <Th>Company</Th>
-                  <Th>Status</Th>
-                  <Th>Payments</Th>
-                  <Th>Total Received</Th>
-                  <Th></Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {loading ? (
-                  <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
-                ) : grouped.length === 0 ? (
-                  <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No payments found.</td></tr>
-                ) : grouped.map(g => {
-                  const isOpen = expandedJobs.has(g.job.id)
-                  return (
-                    <React.Fragment key={g.job.id}>
-                      <tr
-                        key={g.job.id}
-                        className="hover:bg-slate-50 cursor-pointer bg-gray-50/60"
-                        onClick={() => toggleJob(g.job.id)}
-                      >
-                        <td className="pl-4 pr-2 py-3 w-6">
-                          <svg
-                            className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isOpen ? 'rotate-90' : ''}`}
-                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap">{g.job.jobNumber}</td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-gray-800">{g.job.jobName}</div>
-                          {g.job.customer && <div className="text-xs text-gray-400">{g.job.customer}</div>}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-xs text-gray-600">{g.job.company}</div>
-                          <div className="text-xs text-gray-400">{g.job.division}</div>
-                        </td>
-                        <td className="px-4 py-3"><StatusBadge status={g.job.jobStatus} /></td>
-                        <td className="px-4 py-3 text-gray-500 text-xs">{g.payments.length} payment{g.payments.length !== 1 ? 's' : ''}</td>
-                        <td className="px-4 py-3 font-mono font-semibold whitespace-nowrap">{dollars(g.total)}</td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          {g.job._count.projections > 0 && (
-                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mr-2">{g.job._count.projections} proj</span>
-                          )}
-                          <Link
-                            href={`/jobs/${g.job.id}`}
-                            onClick={e => e.stopPropagation()}
-                            className="text-xs text-blue-600 hover:underline"
-                          >
-                            View →
-                          </Link>
-                        </td>
-                      </tr>
-                      {isOpen && g.payments.map(p => (
-                        <tr
-                          key={p.id}
-                          className="hover:bg-blue-50/30 cursor-pointer border-t border-gray-50"
-                          onClick={() => window.location.href = `/jobs/${p.job.id}`}
+        {groupByJob ? (
+          <>
+            {/* Mobile: grouped cards */}
+            <div className="sm:hidden divide-y divide-gray-100">
+              {loading ? (
+                <div className="px-4 py-8 text-center text-gray-400">Loading…</div>
+              ) : grouped.length === 0 ? (
+                <div className="px-4 py-8 text-center text-gray-400">No payments found.</div>
+              ) : grouped.map(g => {
+                const isOpen = expandedJobs.has(g.job.id)
+                return (
+                  <div key={g.job.id}>
+                    <div className="px-4 py-3 bg-gray-50/60 cursor-pointer" onClick={() => toggleJob(g.job.id)}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="font-mono text-xs font-semibold text-gray-600">{g.job.jobNumber}</span>
+                            <StatusBadge status={g.job.jobStatus} />
+                          </div>
+                          <div className="font-medium text-sm text-gray-800 truncate">{g.job.jobName}</div>
+                          {g.job.customer && <div className="text-xs text-gray-400 truncate">{g.job.customer}</div>}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="font-mono font-semibold text-sm">{dollars(g.total)}</div>
+                          <div className="text-xs text-gray-400">{g.payments.length} pmt{g.payments.length !== 1 ? 's' : ''}</div>
+                        </div>
+                        <svg
+                          className={`w-3.5 h-3.5 text-gray-400 transition-transform shrink-0 mt-1 ${isOpen ? 'rotate-90' : ''}`}
+                          fill="none" stroke="currentColor" viewBox="0 0 24 24"
                         >
-                          <td className="pl-4 pr-2 py-2.5">
-                            <div className="w-3.5 flex justify-center">
-                              <div className="w-px h-4 bg-gray-200" />
-                            </div>
-                          </td>
-                          <td className="px-4 py-2.5 text-xs text-gray-400 font-mono" />
-                          <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(p.datePmtReceived)}</td>
-                          <td className="px-4 py-2.5" />
-                          <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
-                            {p.projection?.estimateNumber
-                              ? <span><span className="text-gray-400">Est #</span> {p.projection.estimateNumber}</span>
-                              : '—'}
-                          </td>
-                          <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">{p.paidThruDate ? `Paid thru ${fmtDate(p.paidThruDate)}` : ''}</td>
-                          <td className="px-4 py-2.5 font-mono text-sm font-medium whitespace-nowrap">{dollars(p.amountReceived)}</td>
-                          <td className="px-4 py-2.5 text-right text-xs text-gray-400">{p.notes || ''}</td>
-                        </tr>
-                      ))}
-                    </React.Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <Th>Job #</Th>
-                  <Th>Job Name</Th>
-                  <Th>Company</Th>
-                  <Th>Status</Th>
-                  <Th>Est #</Th>
-                  <Th>Date Received</Th>
-                  <Th>Amount</Th>
-                  <Th>Paid Thru</Th>
-                  <Th></Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {loading ? (
-                  <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
-                ) : filtered.length === 0 ? (
-                  <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">No payments found.</td></tr>
-                ) : filtered.map(p => (
-                  <tr
-                    key={p.id}
-                    className="hover:bg-slate-50 cursor-pointer"
-                    onClick={() => window.location.href = `/jobs/${p.job.id}`}
-                  >
-                    <td className="px-4 py-3 font-mono text-xs font-medium whitespace-nowrap">{p.job.jobNumber}</td>
-                    <td className="px-4 py-3">
-                      <div className="text-gray-800">{p.job.jobName}</div>
-                      {p.job.customer && <div className="text-xs text-gray-400">{p.job.customer}</div>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-xs text-gray-600">{p.job.company}</div>
-                      <div className="text-xs text-gray-400">{p.job.division}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={p.job.jobStatus} />
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{p.projection?.estimateNumber ?? '—'}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDate(p.datePmtReceived)}</td>
-                    <td className="px-4 py-3 font-mono font-medium whitespace-nowrap">{dollars(p.amountReceived)}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{p.paidThruDate ? fmtDate(p.paidThruDate) : '—'}</td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      {p.job._count.projections > 0 && (
-                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mr-2">{p.job._count.projections} proj</span>
-                      )}
-                      <Link
-                        href={`/jobs/${p.job.id}`}
-                        onClick={e => e.stopPropagation()}
-                        className="text-xs text-blue-600 hover:underline"
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </div>
+                    {isOpen && g.payments.map(p => (
+                      <div
+                        key={p.id}
+                        className="pl-8 pr-4 py-3 border-t border-gray-50 bg-white flex items-center justify-between cursor-pointer hover:bg-blue-50/30"
+                        onClick={() => window.location.href = `/jobs/${p.job.id}`}
                       >
-                        View →
-                      </Link>
-                    </td>
+                        <div>
+                          <div className="text-xs text-gray-500">{fmtDate(p.datePmtReceived)}</div>
+                          {p.projection?.estimateNumber && <div className="text-xs text-gray-400">Est # {p.projection.estimateNumber}</div>}
+                          {p.paidThruDate && <div className="text-xs text-gray-400">Paid thru {fmtDate(p.paidThruDate)}</div>}
+                        </div>
+                        <span className="font-mono text-sm font-medium">{dollars(p.amountReceived)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
+            {/* Desktop: grouped table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <Th></Th>
+                    <Th>Job #</Th>
+                    <Th>Job Name</Th>
+                    <Th>Company</Th>
+                    <Th>Status</Th>
+                    <Th>Payments</Th>
+                    <Th>Total Received</Th>
+                    <Th></Th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {loading ? (
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
+                  ) : grouped.length === 0 ? (
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No payments found.</td></tr>
+                  ) : grouped.map(g => {
+                    const isOpen = expandedJobs.has(g.job.id)
+                    return (
+                      <React.Fragment key={g.job.id}>
+                        <tr
+                          className="hover:bg-slate-50 cursor-pointer bg-gray-50/60"
+                          onClick={() => toggleJob(g.job.id)}
+                        >
+                          <td className="pl-4 pr-2 py-3 w-6">
+                            <svg
+                              className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs font-semibold whitespace-nowrap">{g.job.jobNumber}</td>
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-gray-800">{g.job.jobName}</div>
+                            {g.job.customer && <div className="text-xs text-gray-400">{g.job.customer}</div>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-xs text-gray-600">{g.job.company}</div>
+                            <div className="text-xs text-gray-400">{g.job.division}</div>
+                          </td>
+                          <td className="px-4 py-3"><StatusBadge status={g.job.jobStatus} /></td>
+                          <td className="px-4 py-3 text-gray-500 text-xs">{g.payments.length} payment{g.payments.length !== 1 ? 's' : ''}</td>
+                          <td className="px-4 py-3 font-mono font-semibold whitespace-nowrap">{dollars(g.total)}</td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            {g.job._count.projections > 0 && (
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mr-2">{g.job._count.projections} proj</span>
+                            )}
+                            <Link
+                              href={`/jobs/${g.job.id}`}
+                              onClick={e => e.stopPropagation()}
+                              className="text-xs text-blue-600 hover:underline"
+                            >
+                              View →
+                            </Link>
+                          </td>
+                        </tr>
+                        {isOpen && g.payments.map(p => (
+                          <tr
+                            key={p.id}
+                            className="hover:bg-blue-50/30 cursor-pointer border-t border-gray-50"
+                            onClick={() => window.location.href = `/jobs/${p.job.id}`}
+                          >
+                            <td className="pl-4 pr-2 py-2.5">
+                              <div className="w-3.5 flex justify-center">
+                                <div className="w-px h-4 bg-gray-200" />
+                              </div>
+                            </td>
+                            <td className="px-4 py-2.5 text-xs text-gray-400 font-mono" />
+                            <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{fmtDate(p.datePmtReceived)}</td>
+                            <td className="px-4 py-2.5" />
+                            <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                              {p.projection?.estimateNumber
+                                ? <span><span className="text-gray-400">Est #</span> {p.projection.estimateNumber}</span>
+                                : '—'}
+                            </td>
+                            <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">{p.paidThruDate ? `Paid thru ${fmtDate(p.paidThruDate)}` : ''}</td>
+                            <td className="px-4 py-2.5 font-mono text-sm font-medium whitespace-nowrap">{dollars(p.amountReceived)}</td>
+                            <td className="px-4 py-2.5 text-right text-xs text-gray-400">{p.notes || ''}</td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Mobile: flat cards */}
+            <div className="sm:hidden divide-y divide-gray-100">
+              {loading ? (
+                <div className="px-4 py-8 text-center text-gray-400">Loading…</div>
+              ) : filtered.length === 0 ? (
+                <div className="px-4 py-8 text-center text-gray-400">No payments found.</div>
+              ) : filtered.map(p => (
+                <div
+                  key={p.id}
+                  className="px-4 py-3 hover:bg-slate-50 cursor-pointer"
+                  onClick={() => window.location.href = `/jobs/${p.job.id}`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-mono text-xs font-semibold text-gray-600">{p.job.jobNumber}</span>
+                    <StatusBadge status={p.job.jobStatus} />
+                  </div>
+                  <div className="font-medium text-gray-800 text-sm">{p.job.jobName}</div>
+                  {p.job.customer && <div className="text-xs text-gray-400">{p.job.customer}</div>}
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="font-mono font-semibold">{dollars(p.amountReceived)}</span>
+                    <span className="text-xs text-gray-400">{fmtDate(p.datePmtReceived)}</span>
+                  </div>
+                  {(p.projection?.estimateNumber || p.paidThruDate) && (
+                    <div className="flex gap-3 mt-1 text-xs text-gray-400">
+                      {p.projection?.estimateNumber && <span>Est # {p.projection.estimateNumber}</span>}
+                      {p.paidThruDate && <span>Paid thru {fmtDate(p.paidThruDate)}</span>}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* Desktop: flat table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <Th>Job #</Th>
+                    <Th>Job Name</Th>
+                    <Th>Company</Th>
+                    <Th>Status</Th>
+                    <Th>Est #</Th>
+                    <Th>Date Received</Th>
+                    <Th>Amount</Th>
+                    <Th>Paid Thru</Th>
+                    <Th></Th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {loading ? (
+                    <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">Loading…</td></tr>
+                  ) : filtered.length === 0 ? (
+                    <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">No payments found.</td></tr>
+                  ) : filtered.map(p => (
+                    <tr
+                      key={p.id}
+                      className="hover:bg-slate-50 cursor-pointer"
+                      onClick={() => window.location.href = `/jobs/${p.job.id}`}
+                    >
+                      <td className="px-4 py-3 font-mono text-xs font-medium whitespace-nowrap">{p.job.jobNumber}</td>
+                      <td className="px-4 py-3">
+                        <div className="text-gray-800">{p.job.jobName}</div>
+                        {p.job.customer && <div className="text-xs text-gray-400">{p.job.customer}</div>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-xs text-gray-600">{p.job.company}</div>
+                        <div className="text-xs text-gray-400">{p.job.division}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={p.job.jobStatus} />
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{p.projection?.estimateNumber ?? '—'}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDate(p.datePmtReceived)}</td>
+                      <td className="px-4 py-3 font-mono font-medium whitespace-nowrap">{dollars(p.amountReceived)}</td>
+                      <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{p.paidThruDate ? fmtDate(p.paidThruDate) : '—'}</td>
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        {p.job._count.projections > 0 && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full mr-2">{p.job._count.projections} proj</span>
+                        )}
+                        <Link
+                          href={`/jobs/${p.job.id}`}
+                          onClick={e => e.stopPropagation()}
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          View →
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
