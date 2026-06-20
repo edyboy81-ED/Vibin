@@ -184,8 +184,8 @@ export default function DashboardView({ data: d }: { data: DashboardData }) {
       {/* Projected payments */}
       <SectionHeader label="Projected Payments" t={t} />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-        <KpiCard label="Next Week" value={dollars(d.nextWeekTotal)} sub={`${d.nextWeekCount} projections`} valueClass={t.nextWeekValue} href={`/projections?dateFrom=${d.nextWeekMonStr}&dateTo=${d.nextWeekFriStr}&excludeStatus=received`} t={t} />
-        <KpiCard label="Future" value={dollars(d.futureTotal)} sub={`${d.futureCount} projections`} valueClass={t.futureValue} href={`/projections?dateFrom=${d.afterNextWeekFriStr}&excludeStatus=received`} t={t} />
+        <KpiCard label="Next Week" value={dollars(d.nextWeekTotal)} sub={`${d.nextWeekCount} projections`} valueClass={t.nextWeekValue} href={`/projections?dateFrom=${d.nextWeekMonStr}&dateTo=${d.nextWeekFriStr}&excludeStatus=received`} t={t} wrapperClass="col-span-2 sm:col-span-1" />
+        <KpiCard label="Future" value={dollars(d.futureTotal)} sub={`${d.futureCount} projections`} valueClass={t.futureValue} href={`/projections?dateFrom=${d.afterNextWeekFriStr}&excludeStatus=received`} t={t} wrapperClass="col-span-2 sm:col-span-1" />
         <KpiCard label="Projected" value={d.projectedCount.toString()} sub="awaiting payment" valueClass={t.projectedValue} href="/projections?statusName=Projected" t={t} />
         <KpiCard label="Partial" value={d.partialCount.toString()} sub="partially received" valueClass={t.partialValue} href="/projections?statusName=Partial" t={t} />
       </div>
@@ -211,18 +211,18 @@ function SectionHeader({ label, t }: { label: string; t: ThemeConfig }) {
   )
 }
 
-function KpiCard({ label, value, sub, valueClass, href, highlight, t }: {
+function KpiCard({ label, value, sub, valueClass, href, highlight, t, wrapperClass }: {
   label: string; value: string; sub: string; valueClass: string
-  href?: string; highlight?: boolean; t: ThemeConfig
+  href?: string; highlight?: boolean; t: ThemeConfig; wrapperClass?: string
 }) {
-  const base = `group rounded-xl p-5 transition-all block ${highlight ? t.kpiHighlight : t.kpiCard}`
+  const base = `group rounded-xl p-5 transition-all block h-full ${highlight ? t.kpiHighlight : t.kpiCard}`
 
   const inner = t.accentBar ? (
     <div className="flex gap-3 items-stretch">
       <div className={`w-1 rounded-full shrink-0 ${t.accentBar}`} />
       <div className="flex-1">
         <div className={`text-xs uppercase tracking-wider font-semibold mb-3 ${t.kpiLabel}`}>{label}</div>
-        <div className={`text-sm sm:text-3xl font-bold font-mono leading-none ${valueClass}`}>{value}</div>
+        <div className={`text-xl sm:text-3xl font-bold font-mono leading-none ${valueClass}`}>{value}</div>
         <div className={`text-xs mt-2 ${t.kpiSub}`}>{sub}</div>
       </div>
     </div>
@@ -234,8 +234,12 @@ function KpiCard({ label, value, sub, valueClass, href, highlight, t }: {
     </>
   )
 
-  if (href) return <Link href={href} className={base}>{inner}</Link>
-  return <div className={base}>{inner}</div>
+  const card = href
+    ? <Link href={href} className={base}>{inner}</Link>
+    : <div className={base}>{inner}</div>
+
+  if (wrapperClass) return <div className={wrapperClass}>{card}</div>
+  return card
 }
 
 function QuickLink({ href, label, desc, t }: { href: string; label: string; desc: string; t: ThemeConfig }) {
