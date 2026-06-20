@@ -222,7 +222,7 @@ function KpiCard({ label, value, sub, valueClass, href, highlight, t }: {
       <div className={`w-1 rounded-full shrink-0 ${t.accentBar}`} />
       <div className="flex-1">
         <div className={`text-xs uppercase tracking-wider font-semibold mb-3 ${t.kpiLabel}`}>{label}</div>
-        <div className={`text-xl sm:text-3xl font-bold font-mono leading-none ${valueClass}`}>{value}</div>
+        <div className={`text-sm sm:text-3xl font-bold font-mono leading-none ${valueClass}`}>{value}</div>
         <div className={`text-xs mt-2 ${t.kpiSub}`}>{sub}</div>
       </div>
     </div>
