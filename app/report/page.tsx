@@ -65,7 +65,7 @@ export default function ReportPage() {
       </div>
 
       {/* Date selector — hidden when printing */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-5 flex items-end gap-4 print:hidden">
+      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-5 flex flex-col sm:flex-row sm:items-end gap-4 print:hidden">
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Report Date (Friday)</label>
           <input
@@ -78,7 +78,7 @@ export default function ReportPage() {
               setData(null)
               setEmailBody('')
             }}
-            className="input"
+            className="input w-full sm:w-auto"
           />
           {date && !isFriday(date) && (
             <p className="text-xs text-red-500 mt-1">Please select a Friday.</p>
@@ -87,7 +87,7 @@ export default function ReportPage() {
         <button
           onClick={loadReport}
           disabled={loading || !date || !isFriday(date)}
-          className="bg-slate-900 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
+          className="bg-slate-900 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-slate-700 disabled:opacity-50 w-full sm:w-auto"
         >
           {loading ? 'Loading…' : 'Preview Report'}
         </button>
@@ -118,7 +118,7 @@ export default function ReportPage() {
           </div>
 
           {/* Summary totals */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-5">
             <SummaryCard label="Legacy Receipts" value={dollars(data.legacyReceiptsTotal)} color="text-slate-700" />
             <SummaryCard label="AB Receipts" value={dollars(data.abReceiptsTotal)} color="text-blue-700" />
             <SummaryCard label="Combined Receipts" value={dollars(data.combinedReceiptsTotal)} color="text-green-700" bold />
@@ -199,7 +199,7 @@ function SummaryCard({ label, value, color, bold }: { label: string; value: stri
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
       <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">{label}</p>
-      <p className={`text-lg font-mono ${bold ? 'font-bold' : 'font-medium'} ${color}`}>{value}</p>
+      <p className={`text-sm sm:text-lg font-mono ${bold ? 'font-bold' : 'font-medium'} ${color}`}>{value}</p>
     </div>
   )
 }
@@ -211,14 +211,18 @@ function VarianceCard({ actual, target }: { actual: number; target: number }) {
   const color = target === 0 ? 'text-gray-400' : positive ? 'text-green-600' : 'text-red-600'
   const bg = target === 0 ? '' : positive ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
   const sign = variance > 0 ? '+' : ''
-  const valueStr = target === 0
-    ? '—'
-    : `${sign}${dollars(Math.abs(variance))} / ${sign}${pct!.toFixed(1)}%`
 
   return (
     <div className={`rounded-xl border p-4 ${bg || 'bg-white border-gray-200'}`}>
       <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-1">Var. from Target</p>
-      <p className={`text-lg font-mono font-bold ${color}`}>{valueStr}</p>
+      {target === 0 ? (
+        <p className={`text-sm sm:text-lg font-mono font-bold ${color}`}>—</p>
+      ) : (
+        <>
+          <p className={`text-sm sm:text-lg font-mono font-bold ${color}`}>{sign}{dollars(Math.abs(variance))}</p>
+          <p className={`text-xs font-mono font-semibold mt-0.5 ${color}`}>{sign}{pct!.toFixed(1)}%</p>
+        </>
+      )}
     </div>
   )
 }
@@ -264,65 +268,89 @@ function PaymentDateGroup({ section }: { section: ReportSection }) {
 
 function ProjectionMiniTable({ rows }: { rows: ReportSection['legacyRows'] }) {
   return (
-    <table className="w-full text-xs border border-t-0 border-gray-200 rounded-b-lg overflow-hidden">
-      <thead className="bg-gray-50 border-b border-gray-200">
-        <tr>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Job #</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500">Job Name</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Est #</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Billing Period</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Amount</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Status</th>
-          <th className="px-3 py-1.5 text-left font-medium text-gray-500">Notes</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-gray-50">
+    <>
+      {/* Mobile cards */}
+      <div className="sm:hidden border border-t-0 border-gray-200 rounded-b-lg divide-y divide-gray-100">
         {rows.map((r, i) => (
-          <tr key={i} className="hover:bg-gray-50">
-            <td className="px-3 py-2 font-mono whitespace-nowrap">{r.jobNumber}</td>
-            <td className="px-3 py-2 text-gray-700">{r.jobName}</td>
-            <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.estimateNumber}</td>
-            <td className="px-3 py-2 text-gray-400 whitespace-nowrap">{r.billingPeriod}</td>
-            <td className="px-3 py-2 font-mono whitespace-nowrap">{dollars(r.estimatedAmountOwed)}</td>
-            <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.statusName}</td>
-            <td className="px-3 py-2 text-gray-400">{r.notes || '—'}</td>
-          </tr>
+          <div key={i} className="px-3 py-2.5">
+            <div className="flex items-start justify-between gap-2 mb-0.5">
+              <span className="font-mono text-xs text-gray-500">{r.jobNumber}</span>
+              <span className="text-xs text-gray-400 whitespace-nowrap">{r.statusName}</span>
+            </div>
+            <div className="text-xs text-gray-700 mb-1">{r.jobName}</div>
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-xs font-semibold">{dollars(r.estimatedAmountOwed)}</span>
+              <span className="text-xs text-gray-400">{r.billingPeriod}</span>
+            </div>
+            {r.notes && <div className="text-xs text-gray-400 mt-1 line-clamp-2">{r.notes}</div>}
+          </div>
         ))}
-      </tbody>
-    </table>
+      </div>
+      {/* Desktop table */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full text-xs border border-t-0 border-gray-200 rounded-b-lg overflow-hidden min-w-[520px]">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Job #</th>
+              <th className="px-3 py-1.5 text-left font-medium text-gray-500">Job Name</th>
+              <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Est #</th>
+              <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Billing Period</th>
+              <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Amount</th>
+              <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Status</th>
+              <th className="px-3 py-1.5 text-left font-medium text-gray-500">Notes</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {rows.map((r, i) => (
+              <tr key={i} className="hover:bg-gray-50">
+                <td className="px-3 py-2 font-mono whitespace-nowrap">{r.jobNumber}</td>
+                <td className="px-3 py-2 text-gray-700">{r.jobName}</td>
+                <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.estimateNumber}</td>
+                <td className="px-3 py-2 text-gray-400 whitespace-nowrap">{r.billingPeriod}</td>
+                <td className="px-3 py-2 font-mono whitespace-nowrap">{dollars(r.estimatedAmountOwed)}</td>
+                <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.statusName}</td>
+                <td className="px-3 py-2 text-gray-400">{r.notes || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
 
 function LastWeekTable({ rows }: { rows: LastWeekStatusRow[] }) {
   return (
-    <table className="w-full text-xs">
-      <thead>
-        <tr className="border-b border-gray-100">
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Job #</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Est #</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Amount</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Division</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Status</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-gray-50">
-        {rows.map((r, i) => (
-          <tr key={i}>
-            <td className="py-2 px-3 font-mono whitespace-nowrap">{r.jobNumber}</td>
-            <td className="py-2 px-3 text-gray-700">{r.jobName}</td>
-            <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{r.estimateNumber}</td>
-            <td className="py-2 px-3 font-mono whitespace-nowrap">{dollars(r.estimatedAmountOwed)}</td>
-            <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{r.division}</td>
-            <td className="py-2 px-3">
-              <span className="px-2 py-0.5 rounded-full font-medium whitespace-nowrap" style={{ backgroundColor: r.statusColor + '22', color: r.statusColor }}>
-                {r.statusName}
-              </span>
-            </td>
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs min-w-[460px]">
+        <thead>
+          <tr className="border-b border-gray-100">
+            <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Job #</th>
+            <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
+            <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Est #</th>
+            <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Amount</th>
+            <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Division</th>
+            <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Status</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {rows.map((r, i) => (
+            <tr key={i}>
+              <td className="py-2 px-3 font-mono whitespace-nowrap">{r.jobNumber}</td>
+              <td className="py-2 px-3 text-gray-700">{r.jobName}</td>
+              <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{r.estimateNumber}</td>
+              <td className="py-2 px-3 font-mono whitespace-nowrap">{dollars(r.estimatedAmountOwed)}</td>
+              <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{r.division}</td>
+              <td className="py-2 px-3">
+                <span className="px-2 py-0.5 rounded-full font-medium whitespace-nowrap" style={{ backgroundColor: r.statusColor + '22', color: r.statusColor }}>
+                  {r.statusName}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -349,7 +377,7 @@ function VarianceInsights({
             amount={-movedTotal}
             color="red"
           >
-            <table className="w-full text-xs mt-2">
+            <table className="w-full text-xs mt-2 min-w-[480px]">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Job #</th>
@@ -382,7 +410,7 @@ function VarianceInsights({
             amount={-dueTotal}
             color="orange"
           >
-            <table className="w-full text-xs mt-2">
+            <table className="w-full text-xs mt-2 min-w-[420px]">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Job #</th>
@@ -416,7 +444,7 @@ function VarianceInsights({
             color="orange"
             amountLabel="remaining"
           >
-            <table className="w-full text-xs mt-2">
+            <table className="w-full text-xs mt-2 min-w-[360px]">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Job #</th>
@@ -447,7 +475,7 @@ function VarianceInsights({
             amount={unplannedTotal}
             color="green"
           >
-            <table className="w-full text-xs mt-2">
+            <table className="w-full text-xs mt-2 min-w-[380px]">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="pb-1 pr-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Job #</th>
@@ -502,34 +530,36 @@ function InsightBucket({
         </div>
         <span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded border ${c.badge}`}>{amtStr}</span>
       </div>
-      <div className="px-3 pb-3">{children}</div>
+      <div className="px-3 pb-3 overflow-x-auto">{children}</div>
     </div>
   )
 }
 
 function UnplannedTable({ rows }: { rows: UnplannedReceiptRow[] }) {
   return (
-    <table className="w-full text-xs">
-      <thead>
-        <tr className="border-b border-gray-100">
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Job #</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Division</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Date</th>
-          <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Amount</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-gray-50">
-        {rows.map((r, i) => (
-          <tr key={i}>
-            <td className="py-2 px-3 font-mono whitespace-nowrap">{r.jobNumber}</td>
-            <td className="py-2 px-3 text-gray-700">{r.jobName}</td>
-            <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{r.division}</td>
-            <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{r.datePmtReceived}</td>
-            <td className="py-2 px-3 font-mono whitespace-nowrap">{dollars(r.amountReceived)}</td>
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs min-w-[380px]">
+        <thead>
+          <tr className="border-b border-gray-100">
+            <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Job #</th>
+            <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide">Job Name</th>
+            <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Division</th>
+            <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Date</th>
+            <th className="pb-2 px-3 text-left font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">Amount</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {rows.map((r, i) => (
+            <tr key={i}>
+              <td className="py-2 px-3 font-mono whitespace-nowrap">{r.jobNumber}</td>
+              <td className="py-2 px-3 text-gray-700">{r.jobName}</td>
+              <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{r.division}</td>
+              <td className="py-2 px-3 text-gray-500 whitespace-nowrap">{r.datePmtReceived}</td>
+              <td className="py-2 px-3 font-mono whitespace-nowrap">{dollars(r.amountReceived)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }

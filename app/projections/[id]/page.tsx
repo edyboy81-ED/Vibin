@@ -180,9 +180,9 @@ export default function ProjectionDetailPage() {
 
       {/* Header info */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-4">
-        <div className="flex justify-between items-start mb-4">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-mono font-bold text-lg text-gray-900">{proj.jobNumber}</span>
               <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: proj.status.color + '22', color: proj.status.color }}>
                 {proj.status.name}
@@ -192,7 +192,7 @@ export default function ProjectionDetailPage() {
             <p className="text-gray-700 mt-1">{proj.jobName}</p>
             <p className="text-sm text-gray-400">{proj.company}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 sm:shrink-0">
             {proj.job && (
               <Link href={`/jobs/${proj.job.id}`} className="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 text-gray-500">
                 View Job →

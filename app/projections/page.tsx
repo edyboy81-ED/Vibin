@@ -100,7 +100,7 @@ function ProjectionsContent() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Projections</h1>
           {!loading && (
@@ -110,7 +110,7 @@ function ProjectionsContent() {
             </p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href="/import/projections" className="text-sm border border-gray-300 bg-white px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
             Import CSV
           </Link>
@@ -126,18 +126,18 @@ function ProjectionsContent() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search job # or name…"
-          className="input flex-1 min-w-48"
+          className="input flex-1 min-w-0"
         />
-        <select value={filterDivision} onChange={e => setFilterDivision(e.target.value)} className="input w-36">
+        <select value={filterDivision} onChange={e => setFilterDivision(e.target.value)} className="input w-full sm:w-36">
           <option value="">All Divisions</option>
           <option value="LEGACY">Legacy</option>
           <option value="AB">AB</option>
         </select>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input w-36">
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input w-full sm:w-36">
           <option value="">All Statuses</option>
           {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-        <select value={filterCompany} onChange={e => setFilterCompany(e.target.value)} className="input w-56">
+        <select value={filterCompany} onChange={e => setFilterCompany(e.target.value)} className="input w-full sm:w-56">
           <option value="">All Companies</option>
           {ALL_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
@@ -150,12 +150,12 @@ function ProjectionsContent() {
       {/* Date filter row */}
       <div className="flex gap-3 mb-4 flex-wrap items-center">
         <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Payment date from</label>
-          <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="input w-40" />
+          <label className="text-xs font-medium text-gray-500 whitespace-nowrap">From</label>
+          <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="input flex-1 sm:w-40" />
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-gray-500">to</label>
-          <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="input w-40" />
+          <label className="text-xs font-medium text-gray-500">To</label>
+          <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="input flex-1 sm:w-40" />
         </div>
         <button
           onClick={() => { const w = getThisWeek(); setFilterDateFrom(w.from); setFilterDateTo(w.to) }}
@@ -172,10 +172,10 @@ function ProjectionsContent() {
             onClick={() => { setFilterDateFrom(''); setFilterDateTo('') }}
             className="text-xs text-gray-400 hover:text-gray-600 underline"
           >
-            Clear dates
+            Clear
           </button>
         )}
-        <div className="flex items-center gap-1 ml-auto">
+        <div className="flex items-center gap-1 sm:ml-auto">
           {(['', 'LEGACY', 'AB'] as const).map(d => (
             <button
               key={d}
@@ -249,44 +249,76 @@ export default function ProjectionsPage() {
 
 function ProjectionTable({ rows }: { rows: Projection[] }) {
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="border-b border-gray-100">
-          <Th>Job #</Th>
-          <Th>Job Name</Th>
-          <Th>Est #</Th>
-          <Th>Billing Period</Th>
-          <Th>Amount</Th>
-          <Th>Exp. Payment Date</Th>
-          <Th>Status</Th>
-          <Th>Latest Note</Th>
-          <Th></Th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-gray-50">
+    <>
+      {/* Mobile: card list */}
+      <div className="sm:hidden divide-y divide-gray-100">
         {rows.map(p => (
-          <tr key={p.id} className="hover:bg-slate-50">
-            <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">{p.jobNumber}</td>
-            <td className="px-4 py-3 text-gray-800">{p.jobName}</td>
-            <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{p.estimateNumber}</td>
-            <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{p.billingPeriod}</td>
-            <td className="px-4 py-3 font-mono whitespace-nowrap">{dollars(p.estimatedAmountOwed)}</td>
-            <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(p.estimatedPaymentDate)}</td>
-            <td className="px-4 py-3">
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap" style={{ backgroundColor: p.status.color + '22', color: p.status.color }}>
+          <Link key={p.id} href={`/projections/${p.id}`} className="block px-4 py-3 hover:bg-slate-50">
+            <div className="flex items-start justify-between mb-1">
+              <span className="font-mono text-xs text-gray-500">{p.jobNumber}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ml-2 shrink-0" style={{ backgroundColor: p.status.color + '22', color: p.status.color }}>
                 {p.status.name}
               </span>
-            </td>
-            <td className="px-4 py-3 text-gray-400 text-xs">
-              {p.notes[0]?.content ?? '—'}
-            </td>
-            <td className="px-4 py-3 whitespace-nowrap">
-              <Link href={`/projections/${p.id}`} className="text-xs text-blue-600 hover:underline">View →</Link>
-            </td>
-          </tr>
+            </div>
+            <div className="font-medium text-gray-800 text-sm mb-1.5">{p.jobName}</div>
+            <div className="flex items-center justify-between">
+              <span className="font-mono font-semibold">{dollars(p.estimatedAmountOwed)}</span>
+              <span className="text-xs text-gray-400">{fmtDate(p.estimatedPaymentDate)}</span>
+            </div>
+            {(p.estimateNumber || p.billingPeriod) && (
+              <div className="flex gap-3 mt-1 text-xs text-gray-400">
+                {p.estimateNumber && <span>Est # {p.estimateNumber}</span>}
+                {p.billingPeriod && <span>{p.billingPeriod}</span>}
+              </div>
+            )}
+            {p.notes[0]?.content && (
+              <div className="text-xs text-gray-400 mt-1 truncate">{p.notes[0].content}</div>
+            )}
+          </Link>
         ))}
-      </tbody>
-    </table>
+      </div>
+      {/* Desktop: table */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100">
+              <Th>Job #</Th>
+              <Th>Job Name</Th>
+              <Th>Est #</Th>
+              <Th>Billing Period</Th>
+              <Th>Amount</Th>
+              <Th>Exp. Payment Date</Th>
+              <Th>Status</Th>
+              <Th>Latest Note</Th>
+              <Th></Th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {rows.map(p => (
+              <tr key={p.id} className="hover:bg-slate-50">
+                <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">{p.jobNumber}</td>
+                <td className="px-4 py-3 text-gray-800">{p.jobName}</td>
+                <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{p.estimateNumber}</td>
+                <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{p.billingPeriod}</td>
+                <td className="px-4 py-3 font-mono whitespace-nowrap">{dollars(p.estimatedAmountOwed)}</td>
+                <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(p.estimatedPaymentDate)}</td>
+                <td className="px-4 py-3">
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap" style={{ backgroundColor: p.status.color + '22', color: p.status.color }}>
+                    {p.status.name}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-gray-400 text-xs">
+                  {p.notes[0]?.content ?? '—'}
+                </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <Link href={`/projections/${p.id}`} className="text-xs text-blue-600 hover:underline">View →</Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
 

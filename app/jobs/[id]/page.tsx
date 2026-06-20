@@ -197,9 +197,9 @@ export default function JobDetailPage() {
 
       {/* Job details */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-        <div className="flex justify-between items-start mb-4">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-4">
           <h2 className="font-semibold text-gray-900">Job Details</h2>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {editing ? (
               <>
                 {error && <span className="text-xs text-red-600">{error}</span>}
@@ -324,114 +324,207 @@ export default function JobDetailPage() {
           </form>
         )}
 
-        <table className="w-full table-fixed text-sm">
-          <thead>
-            <tr className="border-b border-gray-100">
-              <Th w="w-[18%]">Date Received</Th>
-              <Th w="w-[18%]">Amount</Th>
-              <Th w="w-[16%]">Paid Thru</Th>
-              <Th w="w-[16%]">Days Since Last</Th>
-              <Th w="w-[24%]">Notes</Th>
-              <Th w="w-[8%]"></Th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {job.payments.length === 0 ? (
-              <tr><td colSpan={6} className="py-6 text-center text-gray-400">No payments logged yet.</td></tr>
-            ) : job.payments.map((p, i) => {
-              const prev = job.payments[i + 1]
-              const daysBetween = prev
-                ? Math.floor((new Date(p.datePmtReceived).getTime() - new Date(prev.datePmtReceived).getTime()) / 86_400_000)
-                : daysSince(p.datePmtReceived)
-              const isEditing = editingPaymentId === p.id
-              if (isEditing) {
-                return (
-                  <tr key={p.id} className="bg-blue-50/40">
-                    <td className="py-2 px-2">
-                      <input type="date" value={editPayForm.datePmtReceived} onChange={e => setEditPayForm(f => ({ ...f, datePmtReceived: e.target.value }))} className="input text-xs w-full" />
-                    </td>
-                    <td className="py-2 px-2">
-                      <input type="number" step="0.01" min="0" value={editPayForm.amountReceived} onChange={e => setEditPayForm(f => ({ ...f, amountReceived: e.target.value }))} className="input text-xs w-full font-mono" />
-                    </td>
-                    <td className="py-2 px-2">
-                      <input type="date" value={editPayForm.paidThruDate} onChange={e => setEditPayForm(f => ({ ...f, paidThruDate: e.target.value }))} className="input text-xs w-full" />
-                    </td>
-                    <td className="py-2 px-2 text-gray-400 text-xs">{daysBetween ?? '—'}</td>
-                    <td className="py-2 px-2">
-                      <input value={editPayForm.notes} onChange={e => setEditPayForm(f => ({ ...f, notes: e.target.value }))} className="input text-xs w-full" placeholder="Notes" />
-                    </td>
-                    <td className="py-2 px-2 text-right whitespace-nowrap">
-                      <button onClick={handleSavePayment} disabled={saving} className="text-xs text-white bg-slate-900 px-2 py-1 rounded hover:bg-slate-700 disabled:opacity-50 mr-1">
-                        {saving ? '…' : 'Save'}
-                      </button>
-                      <button onClick={() => setEditingPaymentId(null)} className="text-xs text-gray-400 hover:text-gray-600">
-                        Cancel
-                      </button>
-                    </td>
-                  </tr>
-                )
-              }
+        {/* Mobile: payment cards */}
+        <div className="sm:hidden divide-y divide-gray-100">
+          {job.payments.length === 0 ? (
+            <div className="py-6 text-center text-gray-400">No payments logged yet.</div>
+          ) : job.payments.map((p, i) => {
+            const prev = job.payments[i + 1]
+            const daysBetween = prev
+              ? Math.floor((new Date(p.datePmtReceived).getTime() - new Date(prev.datePmtReceived).getTime()) / 86_400_000)
+              : daysSince(p.datePmtReceived)
+            const isEditing = editingPaymentId === p.id
+            if (isEditing) {
               return (
-                <React.Fragment key={p.id}>
-                  <tr className="hover:bg-gray-50">
-                    <td className="py-3 px-3">{fmtDate(p.datePmtReceived)}</td>
-                    <td className="py-3 px-3 font-mono">{dollars(p.amountReceived)}</td>
-                    <td className="py-3 px-3 text-gray-500">{fmtDate(p.paidThruDate)}</td>
-                    <td className="py-3 px-3 text-gray-500">{daysBetween ?? '—'}</td>
-                    <td className="py-3 px-3 text-gray-500 text-xs truncate">{p.notes ?? '—'}</td>
-                    <td className="py-3 px-3 text-right whitespace-nowrap">
-                      <button onClick={() => startEditPayment(p)} className="text-xs text-blue-500 hover:text-blue-700 mr-2">Edit</button>
+                <div key={p.id} className="p-3 bg-blue-50/40 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Date Received</label>
+                      <input type="date" value={editPayForm.datePmtReceived} onChange={e => setEditPayForm(f => ({ ...f, datePmtReceived: e.target.value }))} className="input text-xs w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Amount ($)</label>
+                      <input type="number" step="0.01" min="0" value={editPayForm.amountReceived} onChange={e => setEditPayForm(f => ({ ...f, amountReceived: e.target.value }))} className="input text-xs w-full font-mono" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Paid Thru</label>
+                      <input type="date" value={editPayForm.paidThruDate} onChange={e => setEditPayForm(f => ({ ...f, paidThruDate: e.target.value }))} className="input text-xs w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Notes</label>
+                      <input value={editPayForm.notes} onChange={e => setEditPayForm(f => ({ ...f, notes: e.target.value }))} className="input text-xs w-full" placeholder="Optional" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={handleSavePayment} disabled={saving} className="text-xs text-white bg-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-700 disabled:opacity-50">
+                      {saving ? 'Saving…' : 'Save'}
+                    </button>
+                    <button onClick={() => setEditingPaymentId(null)} className="text-xs text-gray-500 px-2 py-1.5">Cancel</button>
+                  </div>
+                </div>
+              )
+            }
+            return (
+              <div key={p.id}>
+                <div className="px-3 py-3">
+                  <div className="flex items-start justify-between mb-1.5">
+                    <span className="text-xs text-gray-500">{fmtDate(p.datePmtReceived)}</span>
+                    <div className="flex gap-3">
+                      <button onClick={() => startEditPayment(p)} className="text-xs text-blue-500 hover:text-blue-700">Edit</button>
                       <button onClick={() => handleDeletePayment(p.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
-                    </td>
-                  </tr>
-                  {p.auditLogs.map(log => (
-                    <tr key={log.id} className="bg-amber-50/40">
-                      <td colSpan={6} className="py-1 px-4 text-xs text-amber-700">
-                        <span className="text-amber-400 mr-2">✎</span>
-                        <span className="text-amber-500 mr-2">{new Date(log.changedAt).toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit', hour: 'numeric', minute: '2-digit' })}</span>
-                        {log.changes}
+                    </div>
+                  </div>
+                  <div className="font-mono font-semibold text-gray-900 text-sm">{dollars(p.amountReceived)}</div>
+                  <div className="flex gap-4 mt-1 text-xs text-gray-400">
+                    {p.paidThruDate && <span>Paid thru {fmtDate(p.paidThruDate)}</span>}
+                    <span>{daysBetween ?? '—'} days since last</span>
+                  </div>
+                  {p.notes && <div className="text-xs text-gray-500 mt-1">{p.notes}</div>}
+                </div>
+                {p.auditLogs.map(log => (
+                  <div key={log.id} className="bg-amber-50/40 px-4 py-1.5 text-xs text-amber-700">
+                    <span className="text-amber-400 mr-2">✎</span>
+                    <span className="text-amber-500 mr-2">{new Date(log.changedAt).toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit', hour: 'numeric', minute: '2-digit' })}</span>
+                    {log.changes}
+                  </div>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Desktop: payment table */}
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full table-fixed text-sm">
+            <thead>
+              <tr className="border-b border-gray-100">
+                <Th w="w-[18%]">Date Received</Th>
+                <Th w="w-[18%]">Amount</Th>
+                <Th w="w-[16%]">Paid Thru</Th>
+                <Th w="w-[16%]">Days Since Last</Th>
+                <Th w="w-[24%]">Notes</Th>
+                <Th w="w-[8%]"></Th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {job.payments.length === 0 ? (
+                <tr><td colSpan={6} className="py-6 text-center text-gray-400">No payments logged yet.</td></tr>
+              ) : job.payments.map((p, i) => {
+                const prev = job.payments[i + 1]
+                const daysBetween = prev
+                  ? Math.floor((new Date(p.datePmtReceived).getTime() - new Date(prev.datePmtReceived).getTime()) / 86_400_000)
+                  : daysSince(p.datePmtReceived)
+                const isEditing = editingPaymentId === p.id
+                if (isEditing) {
+                  return (
+                    <tr key={p.id} className="bg-blue-50/40">
+                      <td className="py-2 px-2">
+                        <input type="date" value={editPayForm.datePmtReceived} onChange={e => setEditPayForm(f => ({ ...f, datePmtReceived: e.target.value }))} className="input text-xs w-full" />
+                      </td>
+                      <td className="py-2 px-2">
+                        <input type="number" step="0.01" min="0" value={editPayForm.amountReceived} onChange={e => setEditPayForm(f => ({ ...f, amountReceived: e.target.value }))} className="input text-xs w-full font-mono" />
+                      </td>
+                      <td className="py-2 px-2">
+                        <input type="date" value={editPayForm.paidThruDate} onChange={e => setEditPayForm(f => ({ ...f, paidThruDate: e.target.value }))} className="input text-xs w-full" />
+                      </td>
+                      <td className="py-2 px-2 text-gray-400 text-xs">{daysBetween ?? '—'}</td>
+                      <td className="py-2 px-2">
+                        <input value={editPayForm.notes} onChange={e => setEditPayForm(f => ({ ...f, notes: e.target.value }))} className="input text-xs w-full" placeholder="Notes" />
+                      </td>
+                      <td className="py-2 px-2 text-right whitespace-nowrap">
+                        <button onClick={handleSavePayment} disabled={saving} className="text-xs text-white bg-slate-900 px-2 py-1 rounded hover:bg-slate-700 disabled:opacity-50 mr-1">
+                          {saving ? '…' : 'Save'}
+                        </button>
+                        <button onClick={() => setEditingPaymentId(null)} className="text-xs text-gray-400 hover:text-gray-600">
+                          Cancel
+                        </button>
                       </td>
                     </tr>
-                  ))}
-                </React.Fragment>
-              )
-            })}
-          </tbody>
-        </table>
+                  )
+                }
+                return (
+                  <React.Fragment key={p.id}>
+                    <tr className="hover:bg-gray-50">
+                      <td className="py-3 px-3">{fmtDate(p.datePmtReceived)}</td>
+                      <td className="py-3 px-3 font-mono">{dollars(p.amountReceived)}</td>
+                      <td className="py-3 px-3 text-gray-500">{fmtDate(p.paidThruDate)}</td>
+                      <td className="py-3 px-3 text-gray-500">{daysBetween ?? '—'}</td>
+                      <td className="py-3 px-3 text-gray-500 text-xs truncate">{p.notes ?? '—'}</td>
+                      <td className="py-3 px-3 text-right whitespace-nowrap">
+                        <button onClick={() => startEditPayment(p)} className="text-xs text-blue-500 hover:text-blue-700 mr-2">Edit</button>
+                        <button onClick={() => handleDeletePayment(p.id)} className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                      </td>
+                    </tr>
+                    {p.auditLogs.map(log => (
+                      <tr key={log.id} className="bg-amber-50/40">
+                        <td colSpan={6} className="py-1 px-4 text-xs text-amber-700">
+                          <span className="text-amber-400 mr-2">✎</span>
+                          <span className="text-amber-500 mr-2">{new Date(log.changedAt).toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit', hour: 'numeric', minute: '2-digit' })}</span>
+                          {log.changes}
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Active projections */}
       {job.projections.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="font-semibold text-gray-900 mb-4">Active Projections</h2>
-          <table className="w-full table-fixed text-sm">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <Th w="w-[15%]">Est #</Th>
-                <Th w="w-[20%]">Amount</Th>
-                <Th w="w-[25%]">Est. Payment Date</Th>
-                <Th w="w-[25%]">Status</Th>
-                <Th w="w-[15%]"></Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {job.projections.map(p => (
-                <tr key={p.id}>
-                  <td className="py-3 px-3 font-mono text-xs">{p.estimateNumber}</td>
-                  <td className="py-3 px-3 font-mono">{dollars(p.estimatedAmountOwed)}</td>
-                  <td className="py-3 px-3">{fmtDate(p.estimatedPaymentDate)}</td>
-                  <td className="py-3 px-3">
-                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: p.status.color + '22', color: p.status.color }}>
-                      {p.status.name}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3">
-                    <Link href={`/projections/${p.id}`} className="text-xs text-blue-600 hover:underline">View →</Link>
-                  </td>
+          {/* Mobile cards */}
+          <div className="sm:hidden divide-y divide-gray-100 -mx-6">
+            {job.projections.map(p => (
+              <div key={p.id} className="px-6 py-3">
+                <div className="flex items-start justify-between mb-1">
+                  <span className="font-mono text-xs text-gray-500">Est # {p.estimateNumber}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: p.status.color + '22', color: p.status.color }}>
+                    {p.status.name}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-semibold text-sm">{dollars(p.estimatedAmountOwed)}</span>
+                  <span className="text-xs text-gray-400">{fmtDate(p.estimatedPaymentDate)}</span>
+                </div>
+                <Link href={`/projections/${p.id}`} className="text-xs text-blue-600 hover:underline mt-1 block">View →</Link>
+              </div>
+            ))}
+          </div>
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full table-fixed text-sm">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <Th w="w-[15%]">Est #</Th>
+                  <Th w="w-[20%]">Amount</Th>
+                  <Th w="w-[25%]">Est. Payment Date</Th>
+                  <Th w="w-[25%]">Status</Th>
+                  <Th w="w-[15%]"></Th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {job.projections.map(p => (
+                  <tr key={p.id}>
+                    <td className="py-3 px-3 font-mono text-xs">{p.estimateNumber}</td>
+                    <td className="py-3 px-3 font-mono">{dollars(p.estimatedAmountOwed)}</td>
+                    <td className="py-3 px-3">{fmtDate(p.estimatedPaymentDate)}</td>
+                    <td className="py-3 px-3">
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: p.status.color + '22', color: p.status.color }}>
+                        {p.status.name}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3">
+                      <Link href={`/projections/${p.id}`} className="text-xs text-blue-600 hover:underline">View →</Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
