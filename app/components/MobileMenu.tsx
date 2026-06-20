@@ -11,13 +11,18 @@ const NAV_LINKS = [
   { href: '/settings', label: 'Settings' },
 ]
 
+async function handleLogout() {
+  await fetch('/api/auth/logout', { method: 'POST' })
+  window.location.href = '/login'
+}
+
 export default function MobileMenu() {
   const [open, setOpen] = useState(false)
 
   return (
     <>
       <button
-        className="md:hidden flex flex-col justify-center gap-1.5 p-2 -mr-2"
+        className="flex flex-col justify-center gap-1.5 p-2 -mr-2"
         onClick={() => setOpen(o => !o)}
         aria-label="Open menu"
       >
@@ -27,7 +32,7 @@ export default function MobileMenu() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
           <div className="absolute top-0 left-0 bottom-0 w-64 bg-slate-900 flex flex-col shadow-2xl">
             <div className="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
@@ -46,6 +51,14 @@ export default function MobileMenu() {
                 </Link>
               ))}
             </nav>
+            <div className="border-t border-slate-700 px-6 py-4">
+              <button
+                onClick={handleLogout}
+                className="text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       )}

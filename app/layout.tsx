@@ -4,7 +4,6 @@ import './globals.css'
 import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth'
-import LogoutButton from './components/LogoutButton'
 import WhatsNewModal from './components/WhatsNewModal'
 import MobileMenu from './components/MobileMenu'
 
@@ -36,9 +35,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <NavLink href="/report">Friday Report</NavLink>
               <NavLink href="/settings">Settings</NavLink>
             </div>
-            <div className="ml-auto flex items-center gap-1">
+            <div className="ml-auto flex items-center">
               <MobileMenu />
-              <LogoutButton />
             </div>
           </nav>
         )}
