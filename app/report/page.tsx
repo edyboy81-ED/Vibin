@@ -264,34 +264,54 @@ function PaymentDateGroup({ section }: { section: ReportSection }) {
 
 function ProjectionMiniTable({ rows }: { rows: ReportSection['legacyRows'] }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs border border-t-0 border-gray-200 rounded-b-lg overflow-hidden min-w-[520px]">
-        <thead className="bg-gray-50 border-b border-gray-200">
-          <tr>
-            <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Job #</th>
-            <th className="px-3 py-1.5 text-left font-medium text-gray-500">Job Name</th>
-            <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Est #</th>
-            <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Billing Period</th>
-            <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Amount</th>
-            <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Status</th>
-            <th className="px-3 py-1.5 text-left font-medium text-gray-500">Notes</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          {rows.map((r, i) => (
-            <tr key={i} className="hover:bg-gray-50">
-              <td className="px-3 py-2 font-mono whitespace-nowrap">{r.jobNumber}</td>
-              <td className="px-3 py-2 text-gray-700">{r.jobName}</td>
-              <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.estimateNumber}</td>
-              <td className="px-3 py-2 text-gray-400 whitespace-nowrap">{r.billingPeriod}</td>
-              <td className="px-3 py-2 font-mono whitespace-nowrap">{dollars(r.estimatedAmountOwed)}</td>
-              <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.statusName}</td>
-              <td className="px-3 py-2 text-gray-400">{r.notes || '—'}</td>
+    <>
+      {/* Mobile cards */}
+      <div className="sm:hidden border border-t-0 border-gray-200 rounded-b-lg divide-y divide-gray-100">
+        {rows.map((r, i) => (
+          <div key={i} className="px-3 py-2.5">
+            <div className="flex items-start justify-between gap-2 mb-0.5">
+              <span className="font-mono text-xs text-gray-500">{r.jobNumber}</span>
+              <span className="text-xs text-gray-400 whitespace-nowrap">{r.statusName}</span>
+            </div>
+            <div className="text-xs text-gray-700 mb-1">{r.jobName}</div>
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-xs font-semibold">{dollars(r.estimatedAmountOwed)}</span>
+              <span className="text-xs text-gray-400">{r.billingPeriod}</span>
+            </div>
+            {r.notes && <div className="text-xs text-gray-400 mt-1 line-clamp-2">{r.notes}</div>}
+          </div>
+        ))}
+      </div>
+      {/* Desktop table */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full text-xs border border-t-0 border-gray-200 rounded-b-lg overflow-hidden min-w-[520px]">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Job #</th>
+              <th className="px-3 py-1.5 text-left font-medium text-gray-500">Job Name</th>
+              <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Est #</th>
+              <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Billing Period</th>
+              <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Amount</th>
+              <th className="px-3 py-1.5 text-left font-medium text-gray-500 whitespace-nowrap">Status</th>
+              <th className="px-3 py-1.5 text-left font-medium text-gray-500">Notes</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {rows.map((r, i) => (
+              <tr key={i} className="hover:bg-gray-50">
+                <td className="px-3 py-2 font-mono whitespace-nowrap">{r.jobNumber}</td>
+                <td className="px-3 py-2 text-gray-700">{r.jobName}</td>
+                <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.estimateNumber}</td>
+                <td className="px-3 py-2 text-gray-400 whitespace-nowrap">{r.billingPeriod}</td>
+                <td className="px-3 py-2 font-mono whitespace-nowrap">{dollars(r.estimatedAmountOwed)}</td>
+                <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{r.statusName}</td>
+                <td className="px-3 py-2 text-gray-400">{r.notes || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
 
