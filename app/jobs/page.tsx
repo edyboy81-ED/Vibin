@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'reac
 import { useSearchParams } from 'next/navigation'
 import { dollars, fmtDate } from '@/lib/format'
 import { ALL_COMPANIES } from '@/lib/companies'
+import { SURETY_OPTIONS, SURETY_LABELS } from '@/lib/surety'
 import Link from 'next/link'
 
 function getThisWeek() {
@@ -29,13 +30,14 @@ interface PaymentRow {
     jobName: string
     company: string
     division: string
+    surety: string
     customer: string | null
     jobStatus: string
     _count: { projections: number }
   }
 }
 
-const BLANK = { jobNumber: '', jobName: '', company: 'Johnson Bros Corporation', customer: '', jobStatus: 'IN_PROGRESS', nextAmountDue: '' }
+const BLANK = { jobNumber: '', jobName: '', company: 'Johnson Bros Corporation', surety: 'UNBONDED', customer: '', jobStatus: 'IN_PROGRESS', nextAmountDue: '' }
 
 function JobsContent() {
   const searchParams = useSearchParams()
@@ -48,6 +50,7 @@ function JobsContent() {
   const [search, setSearch] = useState('')
   const [filterCompany, setFilterCompany] = useState('')
   const [filterDivision, setFilterDivision] = useState(searchParams.get('division') ?? '')
+  const [filterSurety, setFilterSurety] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState(searchParams.get('dateFrom') ?? '')
   const [filterDateTo, setFilterDateTo] = useState(searchParams.get('dateTo') ?? '')
@@ -70,6 +73,7 @@ function JobsContent() {
       if (q && !p.job.jobNumber.toLowerCase().includes(q) && !p.job.jobName.toLowerCase().includes(q) && !p.job.customer?.toLowerCase().includes(q)) return false
       if (filterCompany && p.job.company !== filterCompany) return false
       if (filterDivision && p.job.division !== filterDivision) return false
+      if (filterSurety && p.job.surety !== filterSurety) return false
       if (filterStatus && p.job.jobStatus !== filterStatus) return false
       if (from || to) {
         const d = new Date(p.datePmtReceived)
@@ -78,7 +82,7 @@ function JobsContent() {
       }
       return true
     })
-  }, [payments, search, filterCompany, filterDivision, filterStatus, filterDateFrom, filterDateTo])
+  }, [payments, search, filterCompany, filterDivision, filterSurety, filterStatus, filterDateFrom, filterDateTo])
 
   const filteredTotal = useMemo(() => filtered.reduce((s, p) => s + p.amountReceived, 0), [filtered])
   const hasDateFilter = filterDateFrom || filterDateTo
@@ -161,6 +165,11 @@ function JobsContent() {
                 {ALL_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
+            <Field label="Surety">
+              <select value={form.surety} onChange={e => set('surety', e.target.value)} className="input">
+                {SURETY_OPTIONS.map(s => <option key={s} value={s}>{SURETY_LABELS[s]}</option>)}
+              </select>
+            </Field>
             <Field label="Status">
               <select value={form.jobStatus} onChange={e => set('jobStatus', e.target.value)} className="input">
                 <option value="IN_PROGRESS">In Progress</option>
@@ -195,6 +204,10 @@ function JobsContent() {
         <select value={filterCompany} onChange={e => setFilterCompany(e.target.value)} className="input w-full sm:w-56">
           <option value="">All Companies</option>
           {ALL_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={filterSurety} onChange={e => setFilterSurety(e.target.value)} className="input w-full sm:w-36">
+          <option value="">All Sureties</option>
+          {SURETY_OPTIONS.map(s => <option key={s} value={s}>{SURETY_LABELS[s]}</option>)}
         </select>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input w-full sm:w-36">
           <option value="">All Statuses</option>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 
 interface Status { id: string; name: string; color: string; isSystem: boolean; sortOrder: number }
 
@@ -240,6 +241,23 @@ export default function SettingsPage() {
               <p className="text-xs text-gray-400">{theme.description}</p>
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Admin tools */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mt-5">
+        <h2 className="font-semibold text-gray-900 mb-4">Admin Tools</h2>
+        <div className="space-y-3">
+          <Link
+            href="/admin/surety"
+            className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 hover:bg-gray-50 transition-colors"
+          >
+            <div>
+              <p className="text-sm font-medium text-gray-900">Bulk Surety Assignment</p>
+              <p className="text-xs text-gray-400 mt-0.5">Upload a CSV to assign surety bonds to all existing jobs at once</p>
+            </div>
+            <span className="text-gray-400 text-sm">→</span>
+          </Link>
         </div>
       </div>
     </div>

@@ -3,16 +3,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { dollars, fmtDate, toDateInput } from '@/lib/format'
+import { formatSurety } from '@/lib/surety'
 import Link from 'next/link'
 
 interface Projection {
-  id: string; jobNumber: string; jobName: string; company: string; division: string
+  id: string; jobNumber: string; jobName: string; company: string; division: string; surety: string
   monthYear: string; estimateNumber: string; billingPeriod: string
   estimatedAmountOwed: number; estimatedPaymentDate: string; isActive: boolean
   status: { id: string; name: string; color: string }
   notes: { id: string; content: string; createdAt: string }[]
   movements: { id: string; fromDate: string; toDate: string; reason: string | null; createdAt: string }[]
-  job: { id: string; jobNumber: string; jobName: string } | null
+  job: { id: string; jobNumber: string; jobName: string; surety: string } | null
 }
 
 interface JobSearchResult {
@@ -188,6 +189,7 @@ export default function ProjectionDetailPage() {
                 {proj.status.name}
               </span>
               <span className="text-xs text-gray-400">{proj.division}</span>
+              <span className="text-xs text-gray-400">· {formatSurety(proj.surety)}</span>
             </div>
             <p className="text-gray-700 mt-1">{proj.jobName}</p>
             <p className="text-sm text-gray-400">{proj.company}</p>
@@ -293,6 +295,7 @@ export default function ProjectionDetailPage() {
             <Pair label="Billing Period" value={proj.billingPeriod} />
             <Pair label="Est. Amount Owed" value={dollars(proj.estimatedAmountOwed)} mono />
             <Pair label="Est. Payment Date" value={fmtDate(proj.estimatedPaymentDate)} />
+            <Pair label="Surety" value={formatSurety(proj.surety)} />
           </dl>
         )}
       </div>

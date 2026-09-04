@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { dollars, fmtDate, nextFriday, toDateInput } from '@/lib/format'
-import type { ReportData, ReportSection, LastWeekStatusRow, UnplannedReceiptRow, MovedOutRow, DueNotReceivedRow, PartiallyReceivedRow } from '@/lib/reportBuilder'
+import type { ReportData, ReportSection, LastWeekStatusRow, UnplannedReceiptRow, MovedOutRow, DueNotReceivedRow, PartiallyReceivedRow, SuretyBreakdownRow } from '@/lib/reportBuilder'
 
 interface ReportResponse extends Omit<ReportData, 'reportDate'> {
   reportDate: string
@@ -126,6 +126,11 @@ export default function ReportPage() {
             <VarianceCard actual={data.combinedReceiptsTotal} target={data.thisWeekProjectedTotal} />
           </div>
 
+          {/* Surety breakdown */}
+          {data.suretyBreakdown.length > 0 && (
+            <SuretyBreakdownTable rows={data.suretyBreakdown} />
+          )}
+
           {/* Variance insight breakdown */}
           {(data.movedOut.length > 0 || data.dueNotReceived.length > 0 || data.partiallyReceived.length > 0 || data.unplannedReceipts.length > 0) && (
             <VarianceInsights
@@ -223,6 +228,44 @@ function VarianceCard({ actual, target }: { actual: number; target: number }) {
           <p className={`text-xs font-mono font-semibold mt-0.5 ${color}`}>{sign}{pct!.toFixed(1)}%</p>
         </>
       )}
+    </div>
+  )
+}
+
+function SuretyBreakdownTable({ rows }: { rows: SuretyBreakdownRow[] }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4 break-inside-avoid">
+      <h2 className="font-semibold text-gray-900 mb-4">Surety Breakdown</h2>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[480px]">
+          <thead>
+            <tr className="border-b border-gray-100">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">Surety</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">This Week Received</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Next Week Projected</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold text-gray-400 uppercase tracking-wide">Future Projected</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {rows.map(r => (
+              <tr key={r.surety} className="hover:bg-slate-50">
+                <td className="px-3 py-2.5 font-medium text-gray-800">{r.label}</td>
+                <td className="px-3 py-2.5 text-right font-mono text-slate-700">{r.receiptsTotal > 0 ? dollars(r.receiptsTotal) : <span className="text-gray-300">—</span>}</td>
+                <td className="px-3 py-2.5 text-right font-mono text-amber-700">{r.nextWeekTotal > 0 ? dollars(r.nextWeekTotal) : <span className="text-gray-300">—</span>}</td>
+                <td className="px-3 py-2.5 text-right font-mono text-gray-600">{r.futureTotal > 0 ? dollars(r.futureTotal) : <span className="text-gray-300">—</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-gray-200 bg-gray-50">
+              <td className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</td>
+              <td className="px-3 py-2 text-right font-mono font-semibold text-slate-700">{dollars(rows.reduce((s, r) => s + r.receiptsTotal, 0))}</td>
+              <td className="px-3 py-2 text-right font-mono font-semibold text-amber-700">{dollars(rows.reduce((s, r) => s + r.nextWeekTotal, 0))}</td>
+              <td className="px-3 py-2 text-right font-mono font-semibold text-gray-600">{dollars(rows.reduce((s, r) => s + r.futureTotal, 0))}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   )
 }

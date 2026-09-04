@@ -1,5 +1,6 @@
 import { prisma } from './db'
 import { dollars, fmtDate } from './format'
+import { SURETY_LABELS, SURETY_OPTIONS } from './surety'
 
 // UTC-safe helpers used only within this module
 function utcStartOfDay(d: Date): Date {
@@ -18,6 +19,14 @@ export interface ReportSection {
   abTotal: number        // cents
   legacyRows: ProjectionRow[]
   abRows: ProjectionRow[]
+}
+
+export interface SuretyBreakdownRow {
+  surety: string          // e.g. "ZURICH"
+  label: string           // e.g. "Zurich"
+  receiptsTotal: number   // cents — this week
+  nextWeekTotal: number   // cents
+  futureTotal: number     // cents
 }
 
 export interface ProjectionRow {
@@ -92,6 +101,8 @@ export interface ReportData {
   // Projections
   nextWeekSections: ReportSection[]
   futureSections: ReportSection[]
+  // Surety breakdown
+  suretyBreakdown: SuretyBreakdownRow[]
   // Last week projection status
   lastWeekStatus: LastWeekStatusRow[]
   // Unplanned receipts
@@ -125,7 +136,7 @@ export async function buildReport(reportDate: Date): Promise<ReportData> {
   const [weekPayments, currentWeekProjections, weekMovements] = await Promise.all([
     prisma.payment.findMany({
       where: { datePmtReceived: { gte: weekStart, lte: weekEnd } },
-      include: { job: { select: { division: true, jobNumber: true, jobName: true } } },
+      include: { job: { select: { division: true, jobNumber: true, jobName: true, surety: true } } },
     }),
     prisma.projectedPayment.findMany({
       where: { estimatedPaymentDate: { gte: weekStart, lte: weekEnd }, isActive: true },
@@ -180,7 +191,7 @@ export async function buildReport(reportDate: Date): Promise<ReportData> {
   }))
 
   const dueNotReceived: DueNotReceivedRow[] = currentWeekProjections
-    .filter(p => !['received', 'partial'].includes(p.status.name.toLowerCase()))
+    .filter(p => !['received', 'partial', 'archived'].includes(p.status.name.toLowerCase()))
     .map(p => ({
       jobNumber: p.jobNumber,
       jobName: p.jobName,
@@ -204,7 +215,14 @@ export async function buildReport(reportDate: Date): Promise<ReportData> {
 
   // --- Projections: next week ---
   const nextWeekProjections = await prisma.projectedPayment.findMany({
-    where: { estimatedPaymentDate: { gte: nextWeekStart, lte: nextWeekEnd }, isActive: true, NOT: [{ status: { name: { equals: 'received', mode: 'insensitive' } } }] },
+    where: {
+      estimatedPaymentDate: { gte: nextWeekStart, lte: nextWeekEnd },
+      isActive: true,
+      NOT: [
+        { status: { name: { equals: 'received', mode: 'insensitive' } } },
+        { status: { name: { equals: 'archived', mode: 'insensitive' } } },
+      ],
+    },
     include: {
       status: true,
       notes: { orderBy: { createdAt: 'desc' }, take: 1 },
@@ -214,7 +232,14 @@ export async function buildReport(reportDate: Date): Promise<ReportData> {
 
   // --- Projections: future ---
   const futureProjections = await prisma.projectedPayment.findMany({
-    where: { estimatedPaymentDate: { gte: futureStart }, isActive: true, NOT: [{ status: { name: { equals: 'received', mode: 'insensitive' } } }] },
+    where: {
+      estimatedPaymentDate: { gte: futureStart },
+      isActive: true,
+      NOT: [
+        { status: { name: { equals: 'received', mode: 'insensitive' } } },
+        { status: { name: { equals: 'archived', mode: 'insensitive' } } },
+      ],
+    },
     include: {
       status: true,
       notes: { orderBy: { createdAt: 'desc' }, take: 1 },
@@ -246,6 +271,15 @@ export async function buildReport(reportDate: Date): Promise<ReportData> {
     p => !activeProjectionJobIds.has(p.jobId)
   )
 
+  // --- Surety breakdown ---
+  const suretyBreakdown: SuretyBreakdownRow[] = SURETY_OPTIONS.map(s => ({
+    surety: s,
+    label: SURETY_LABELS[s] ?? s,
+    receiptsTotal: weekPayments.filter(p => p.job.surety === s).reduce((acc, p) => acc + p.amountReceived, 0),
+    nextWeekTotal: nextWeekProjections.filter(p => p.surety === s).reduce((acc, p) => acc + p.estimatedAmountOwed, 0),
+    futureTotal: futureProjections.filter(p => p.surety === s).reduce((acc, p) => acc + p.estimatedAmountOwed, 0),
+  })).filter(r => r.receiptsTotal > 0 || r.nextWeekTotal > 0 || r.futureTotal > 0)
+
   return {
     reportDate: friday,
     legacyReceiptsTotal,
@@ -254,6 +288,7 @@ export async function buildReport(reportDate: Date): Promise<ReportData> {
     thisWeekProjectedTotal,
     nextWeekSections: groupByDate(nextWeekProjections),
     futureSections: groupByDate(futureProjections),
+    suretyBreakdown,
     lastWeekStatus: lastWeekProjections.map(p => ({
       jobNumber: p.jobNumber,
       jobName: p.jobName,
@@ -394,6 +429,26 @@ export function generateEmailBody(data: ReportData): string {
       }
       lines.push('')
     }
+  }
+
+  // ── Surety Breakdown ─────────────────────────────────────
+  if (data.suretyBreakdown.length > 0) {
+    lines.push(div)
+    lines.push('SURETY BREAKDOWN')
+    lines.push(div)
+    const col = (s: string, w: number) => s.padEnd(w)
+    lines.push('  ' + col('Surety', 14) + col('This Week Received', 22) + col('Next Week Projected', 22) + 'Future Projected')
+    lines.push('  ' + '─'.repeat(78))
+    for (const r of data.suretyBreakdown) {
+      lines.push(
+        '  ' +
+        col(r.label, 14) +
+        col(r.receiptsTotal > 0 ? dollars(r.receiptsTotal) : '—', 22) +
+        col(r.nextWeekTotal > 0 ? dollars(r.nextWeekTotal) : '—', 22) +
+        (r.futureTotal > 0 ? dollars(r.futureTotal) : '—')
+      )
+    }
+    lines.push('')
   }
 
   // ── Projected Payments Summary (table by week) ───────────

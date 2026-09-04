@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getDivision } from '@/lib/companies'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const sp = req.nextUrl.searchParams
+  const surety = sp.get('surety')
+
   const jobs = await prisma.job.findMany({
+    where: {
+      ...(surety ? { surety } : {}),
+    },
     orderBy: { jobNumber: 'asc' },
     include: {
       payments: { orderBy: { datePmtReceived: 'desc' }, take: 1 },
@@ -15,7 +21,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { jobNumber, jobName, company, jobStatus, paidThruDate, billedThruDate, nextAmountDue, customer, notes } = body
+  const { jobNumber, jobName, company, surety, jobStatus, paidThruDate, billedThruDate, nextAmountDue, customer, notes } = body
 
   if (!jobNumber || !jobName || !company) {
     return NextResponse.json({ error: 'jobNumber, jobName, and company are required' }, { status: 400 })
@@ -28,6 +34,7 @@ export async function POST(req: NextRequest) {
         jobName: String(jobName).trim(),
         company: String(company),
         division: getDivision(String(company)),
+        surety: surety ?? 'UNBONDED',
         jobStatus: jobStatus ?? 'IN_PROGRESS',
         paidThruDate: paidThruDate ? new Date(paidThruDate) : null,
         billedThruDate: billedThruDate ? new Date(billedThruDate) : null,

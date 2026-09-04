@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { dollars, fmtDate } from '@/lib/format'
+import { SURETY_OPTIONS, SURETY_LABELS } from '@/lib/surety'
 
 function getThisWeek() {
   const today = new Date()
@@ -18,7 +19,7 @@ import Link from 'next/link'
 
 interface Projection {
   id: string; jobNumber: string; jobName: string; company: string
-  division: string; estimateNumber: string; estimatedAmountOwed: number
+  division: string; surety: string; estimateNumber: string; estimatedAmountOwed: number
   estimatedPaymentDate: string; monthYear: string; billingPeriod: string
   isActive: boolean
   status: { id: string; name: string; color: string }
@@ -36,9 +37,11 @@ function ProjectionsContent() {
   const [filterDivision, setFilterDivision] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterCompany, setFilterCompany] = useState('')
+  const [filterSurety, setFilterSurety] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState(searchParams.get('dateFrom') ?? '')
   const [filterDateTo, setFilterDateTo] = useState(searchParams.get('dateTo') ?? '')
   const [showInactive, setShowInactive] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
 
   const fetchData = useCallback(async () => {
     const [pRes, sRes] = await Promise.all([
@@ -68,10 +71,12 @@ function ProjectionsContent() {
     const excludeStatus = searchParams.get('excludeStatus')?.toLowerCase() ?? null
     return projections.filter(p => {
       if (!showInactive && !p.isActive) return false
+      if (!showArchived && p.status.name.toLowerCase() === 'archived') return false
       if (q && !p.jobNumber.toLowerCase().includes(q) && !p.jobName.toLowerCase().includes(q)) return false
       if (filterDivision && p.division !== filterDivision) return false
       if (filterStatus && p.status.id !== filterStatus) return false
       if (filterCompany && p.company !== filterCompany) return false
+      if (filterSurety && p.surety !== filterSurety) return false
       if (excludeStatus && p.status.name.toLowerCase() === excludeStatus) return false
       if (from || to) {
         const d = new Date(p.estimatedPaymentDate)
@@ -80,7 +85,7 @@ function ProjectionsContent() {
       }
       return true
     })
-  }, [projections, search, filterDivision, filterStatus, filterCompany, showInactive, filterDateFrom, filterDateTo, searchParams])
+  }, [projections, search, filterDivision, filterStatus, filterCompany, filterSurety, showInactive, showArchived, filterDateFrom, filterDateTo, searchParams])
 
   // Group by payment date
   const grouped = useMemo(() => {
@@ -141,9 +146,17 @@ function ProjectionsContent() {
           <option value="">All Companies</option>
           {ALL_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
+        <select value={filterSurety} onChange={e => setFilterSurety(e.target.value)} className="input w-full sm:w-36">
+          <option value="">All Sureties</option>
+          {SURETY_OPTIONS.map(s => <option key={s} value={s}>{SURETY_LABELS[s]}</option>)}
+        </select>
         <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer">
           <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} />
           Show inactive
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer">
+          <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} />
+          Show archived
         </label>
       </div>
 
