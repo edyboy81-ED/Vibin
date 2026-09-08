@@ -32,15 +32,23 @@ export async function POST(req: NextRequest) {
   const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').map(l => l.trim()).filter(Boolean)
   if (lines.length < 2) return NextResponse.json({ error: 'CSV must have a header row and at least one data row' }, { status: 400 })
 
-  const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase().replace(/\s+/g, ' '))
+  const JOB_ALIASES = ['job', 'job #', 'job#', 'job number', 'jobnumber']
+  const SURETY_ALIASES = ['surety', 'surety type', 'bond', 'bond type', 'surety bond']
 
-  const jobNumCol = headers.findIndex(h => ['job', 'job #', 'job#', 'job number', 'jobnumber'].includes(h))
-  const suretyCol = headers.findIndex(h => ['surety', 'surety type', 'bond', 'bond type', 'surety bond'].includes(h))
+  // Find the first row that looks like a header (contains a job # and surety column)
+  let headerRowIndex = -1
+  let jobNumCol = -1
+  let suretyCol = -1
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+    const cols = parseCSVLine(lines[i]).map(h => h.trim().toLowerCase().replace(/\s+/g, ' '))
+    const j = cols.findIndex(h => JOB_ALIASES.includes(h))
+    const s = cols.findIndex(h => SURETY_ALIASES.includes(h))
+    if (j !== -1 && s !== -1) { headerRowIndex = i; jobNumCol = j; suretyCol = s; break }
+  }
 
-  if (jobNumCol === -1) return NextResponse.json({ error: 'Could not find a Job # column' }, { status: 400 })
-  if (suretyCol === -1) return NextResponse.json({ error: 'Could not find a Surety column' }, { status: 400 })
+  if (headerRowIndex === -1) return NextResponse.json({ error: 'Could not find a Job # column' }, { status: 400 })
 
-  const rows = lines.slice(1).map(line => {
+  const rows = lines.slice(headerRowIndex + 1).map(line => {
     const vals = parseCSVLine(line)
     return { jobNumber: (vals[jobNumCol] ?? '').trim(), surety: (vals[suretyCol] ?? '').trim() }
   }).filter(r => r.jobNumber)
