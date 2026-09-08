@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { dollars, fmtDate } from '@/lib/format'
-import { SURETY_OPTIONS, SURETY_LABELS } from '@/lib/surety'
+import { SURETY_OPTIONS, SURETY_LABELS, formatSurety } from '@/lib/surety'
 
 function getThisWeek() {
   const today = new Date()
@@ -278,6 +278,7 @@ function ProjectionTable({ rows }: { rows: Projection[] }) {
               <span className="font-mono font-semibold">{dollars(p.estimatedAmountOwed)}</span>
               <span className="text-xs text-gray-400">{fmtDate(p.estimatedPaymentDate)}</span>
             </div>
+            <div className="text-xs text-gray-400 mt-1">{formatSurety(p.surety)}</div>
             {(p.estimateNumber || p.billingPeriod) && (
               <div className="flex gap-3 mt-1 text-xs text-gray-400">
                 {p.estimateNumber && <span>Est # {p.estimateNumber}</span>}
@@ -297,6 +298,7 @@ function ProjectionTable({ rows }: { rows: Projection[] }) {
             <tr className="border-b border-gray-100">
               <Th>Job #</Th>
               <Th>Job Name</Th>
+              <Th>Surety</Th>
               <Th>Est #</Th>
               <Th>Billing Period</Th>
               <Th>Amount</Th>
@@ -311,6 +313,7 @@ function ProjectionTable({ rows }: { rows: Projection[] }) {
               <tr key={p.id} className="hover:bg-slate-50">
                 <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">{p.jobNumber}</td>
                 <td className="px-4 py-3 text-gray-800">{p.jobName}</td>
+                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{formatSurety(p.surety)}</td>
                 <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{p.estimateNumber}</td>
                 <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{p.billingPeriod}</td>
                 <td className="px-4 py-3 font-mono whitespace-nowrap">{dollars(p.estimatedAmountOwed)}</td>
