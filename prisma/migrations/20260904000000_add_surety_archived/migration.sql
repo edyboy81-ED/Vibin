@@ -8,3 +8,8 @@ ALTER TABLE "ProjectedPayment" ADD COLUMN "surety" TEXT NOT NULL DEFAULT 'UNBOND
 INSERT INTO "ProjectionStatus" (id, name, color, "isSystem", "sortOrder", "createdAt", "updatedAt")
 SELECT gen_random_uuid()::text, 'Archived', '#9ca3af', true, 99, now(), now()
 WHERE NOT EXISTS (SELECT 1 FROM "ProjectionStatus" WHERE lower(name) = 'archived');
+
+-- Retroactively move all existing Received projections to Archived
+UPDATE "ProjectedPayment"
+SET "statusId" = (SELECT id FROM "ProjectionStatus" WHERE lower(name) = 'archived')
+WHERE "statusId" = (SELECT id FROM "ProjectionStatus" WHERE lower(name) = 'received');
