@@ -32,6 +32,7 @@ export interface SuretyBreakdownRow {
 export interface ProjectionRow {
   jobNumber: string
   jobName: string
+  surety: string
   monthYear: string
   estimateNumber: string
   billingPeriod: string
@@ -325,6 +326,7 @@ function groupByDate(projections: any[]): ReportSection[] {
     const row: ProjectionRow = {
       jobNumber: p.jobNumber,
       jobName: p.jobName,
+      surety: p.surety ?? 'UNBONDED',
       monthYear: p.monthYear,
       estimateNumber: p.estimateNumber,
       billingPeriod: p.billingPeriod,
