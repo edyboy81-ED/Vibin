@@ -6,6 +6,7 @@ interface ConfirmedRow {
   jobNumber: string
   jobName: string
   company: string
+  surety?: string
   estimateNumber: string
   billingPeriod: string
   monthYear: string
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   const errors: string[] = []
 
   for (const row of rows) {
-    const { jobNumber, jobName, company, estimateNumber, billingPeriod, monthYear,
+    const { jobNumber, jobName, company, surety, estimateNumber, billingPeriod, monthYear,
             estimatedAmountOwed, estimatedPaymentDate, statusId, notes } = row
 
     if (!jobNumber || !jobName || !company) {
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
 
     const division = getDivision(company)
     const paymentDate = new Date(estimatedPaymentDate)
+    const jobSurety = surety ?? 'UNBONDED'
 
     let jobId: string
     try {
@@ -44,7 +46,7 @@ export async function POST(req: NextRequest) {
         jobId = existing.id
       } else {
         const created = await prisma.job.create({
-          data: { jobNumber, jobName, company, division },
+          data: { jobNumber, jobName, company, division, surety: jobSurety },
         })
         jobId = created.id
         stats.jobsCreated++
@@ -66,6 +68,7 @@ export async function POST(req: NextRequest) {
         jobName,
         company,
         division,
+        surety: jobSurety,
         monthYear,
         estimateNumber,
         billingPeriod,

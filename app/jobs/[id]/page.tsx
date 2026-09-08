@@ -4,11 +4,12 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { dollars, fmtDate, toDateInput, daysSince } from '@/lib/format'
 import { ALL_COMPANIES } from '@/lib/companies'
+import { SURETY_OPTIONS, SURETY_LABELS, formatSurety } from '@/lib/surety'
 import Link from 'next/link'
 
 interface Job {
   id: string; jobNumber: string; jobName: string; company: string
-  division: string; customer: string | null; jobStatus: string; paidThruDate: string | null
+  division: string; surety: string; customer: string | null; jobStatus: string; paidThruDate: string | null
   billedThruDate: string | null; nextAmountDue: number | null; notes: string | null
   payments: Payment[]
   projections: Projection[]
@@ -70,6 +71,7 @@ export default function JobDetailPage() {
   useEffect(() => {
     if (job) setEditForm({
       jobNumber: job.jobNumber, jobName: job.jobName, company: job.company, customer: job.customer ?? '',
+      surety: job.surety ?? 'UNBONDED',
       jobStatus: job.jobStatus,
       paidThruDate: toDateInput(job.paidThruDate), billedThruDate: toDateInput(job.billedThruDate),
       nextAmountDue: job.nextAmountDue != null ? (job.nextAmountDue / 100).toFixed(2) : '',
@@ -227,6 +229,11 @@ export default function JobDetailPage() {
                 {ALL_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
+            <Field label="Surety">
+              <select value={editForm.surety} onChange={e => ef('surety', e.target.value)} className="input">
+                {SURETY_OPTIONS.map(s => <option key={s} value={s}>{SURETY_LABELS[s]}</option>)}
+              </select>
+            </Field>
             <Field label="Status">
               <select value={editForm.jobStatus} onChange={e => ef('jobStatus', e.target.value)} className="input">
                 <option value="IN_PROGRESS">In Progress</option>
@@ -247,6 +254,7 @@ export default function JobDetailPage() {
             <Pair label="Customer" value={job.customer ?? ''} />
             <Pair label="Company" value={job.company} />
             <Pair label="Division" value={job.division} />
+            <Pair label="Surety" value={formatSurety(job.surety)} />
             <Pair label="Status" value={job.jobStatus === 'IN_PROGRESS' ? 'In Progress' : 'Closed'} />
             <Pair label="Paid Thru Date" value={fmtDate(job.paidThruDate)} />
             <Pair label="Billed Thru Date" value={fmtDate(job.billedThruDate)} />

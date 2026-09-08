@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { normalizeSurety } from '@/lib/surety'
 
 function parseCSVLine(line: string): string[] {
   const result: string[] = []
@@ -43,6 +44,7 @@ const ALIASES: Record<string, string[]> = {
   estimatedPaymentDate:  ['expected payment date', 'est payment date', 'estimated payment date', 'payment date', 'expected date', 'est date'],
   status:                ['status'],
   notes:                 ['notes', 'note', 'comments'],
+  surety:                ['surety', 'surety type', 'bond', 'bond type', 'surety bond'],
 }
 
 function resolveColumns(headers: string[]): Record<string, string> {
@@ -144,7 +146,7 @@ export async function POST(req: NextRequest) {
   }
 
   const [allJobs, allStatuses] = await Promise.all([
-    prisma.job.findMany({ select: { id: true, jobNumber: true, jobName: true, company: true, division: true } }),
+    prisma.job.findMany({ select: { id: true, jobNumber: true, jobName: true, company: true, division: true, surety: true } }),
     prisma.projectionStatus.findMany(),
   ])
   const jobMap = new Map(allJobs.map(j => [j.jobNumber, j]))
@@ -210,6 +212,7 @@ export async function POST(req: NextRequest) {
     const billingPeriod = get('billingPeriod') || '—'
     const monthYear = get('monthYear') || `${estimatedPaymentDate.getMonth() + 1}/${estimatedPaymentDate.getFullYear()}`
     const notes = get('notes') || null
+    const csvSurety = get('surety')
 
     const statusName = get('status').toLowerCase()
     const status = (statusName && statusMap.get(statusName)) ? statusMap.get(statusName)! : defaultStatus
@@ -224,11 +227,13 @@ export async function POST(req: NextRequest) {
 
     if (!job) {
       // Collect for the user to review and create jobs manually
+      const normalizedSurety = csvSurety ? normalizeSurety(csvSurety) : 'UNBONDED'
       unmatched.push({
         rowIndex: rowIndex + 2,
         jobNumber,
         jobName: get('jobName') || '',
         company: get('company') || '',
+        surety: normalizedSurety,
         estimateNumber,
         billingPeriod,
         monthYear,
@@ -294,6 +299,14 @@ export async function POST(req: NextRequest) {
       continue
     }
 
+    // If CSV has a surety column, update the job's surety too
+    if (csvSurety) {
+      const normalized = normalizeSurety(csvSurety)
+      if (job.surety !== normalized) {
+        await prisma.job.update({ where: { id: job.id }, data: { surety: normalized } })
+      }
+    }
+
     await prisma.projectedPayment.create({
       data: {
         jobId: job.id,
@@ -301,6 +314,7 @@ export async function POST(req: NextRequest) {
         jobName: job.jobName,
         company: job.company,
         division: job.division,
+        surety: csvSurety ? normalizeSurety(csvSurety) : job.surety,
         monthYear,
         estimateNumber,
         billingPeriod,

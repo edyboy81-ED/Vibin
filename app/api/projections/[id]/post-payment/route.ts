@@ -24,12 +24,16 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     if (!projection) return NextResponse.json({ error: 'Projection not found' }, { status: 404 })
     if (!projection.jobId) return NextResponse.json({ error: 'This projection is not linked to a job.' }, { status: 422 })
 
-    const [receivedStatus, partialStatus] = await Promise.all([
-      prisma.projectionStatus.findFirst({ where: { name: { equals: 'Received', mode: 'insensitive' } } }),
+    const [archivedStatus, partialStatus] = await Promise.all([
+      prisma.projectionStatus.findFirst({ where: { name: { equals: 'Archived', mode: 'insensitive' } } }),
       prisma.projectionStatus.findFirst({ where: { name: { equals: 'Partial', mode: 'insensitive' } } }),
     ])
 
-    if (!receivedStatus) return NextResponse.json({ error: '"Received" status not found. Add it in Settings.' }, { status: 422 })
+    // Fall back to Received if Archived status hasn't been seeded yet
+    const fullyPaidStatus = archivedStatus
+      ?? await prisma.projectionStatus.findFirst({ where: { name: { equals: 'Received', mode: 'insensitive' } } })
+
+    if (!fullyPaidStatus) return NextResponse.json({ error: '"Archived" status not found. Run the pending migration.' }, { status: 422 })
 
     const amountCents = Math.round(Number(amountReceived))
     const currentBalance = projection.estimatedAmountOwed
@@ -37,10 +41,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const remainingBalance = isFullyPaid ? 0 : currentBalance - amountCents
 
     const noteContent = isFullyPaid
-      ? `[System] Payment of ${formatMoney(amountCents)} received. Projection fully paid.`
+      ? `[System] Payment of ${formatMoney(amountCents)} received. Projection fully paid and archived.`
       : `[System] Partial payment of ${formatMoney(amountCents)} received. Balance reduced from ${formatMoney(currentBalance)} to ${formatMoney(remainingBalance)}.`
 
-    // Try with projectionId link first; fall back if migration not yet applied
     try {
       await prisma.$transaction([
         prisma.payment.create({
@@ -54,7 +57,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         prisma.projectedPayment.update({
           where: { id },
           data: {
-            statusId: isFullyPaid ? receivedStatus.id : (partialStatus?.id ?? receivedStatus.id),
+            statusId: isFullyPaid ? fullyPaidStatus.id : (partialStatus?.id ?? fullyPaidStatus.id),
             estimatedAmountOwed: isFullyPaid ? currentBalance : remainingBalance,
             notes: { create: [{ content: noteContent }] },
           },
@@ -72,7 +75,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         prisma.projectedPayment.update({
           where: { id },
           data: {
-            statusId: isFullyPaid ? receivedStatus.id : (partialStatus?.id ?? receivedStatus.id),
+            statusId: isFullyPaid ? fullyPaidStatus.id : (partialStatus?.id ?? fullyPaidStatus.id),
             estimatedAmountOwed: isFullyPaid ? currentBalance : remainingBalance,
             notes: { create: [{ content: noteContent }] },
           },
