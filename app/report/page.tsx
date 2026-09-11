@@ -73,35 +73,57 @@ export default function ReportPage() {
       `<th style="background-color:#1A1B2D;color:#fff;padding:8px 12px;text-align:${right?'right':'left'};font-size:11px;letter-spacing:.06em;text-transform:uppercase">${t}</th>`
     const tbl = (head: string, body: string) =>
       `<table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:13px;margin:10px 0 18px"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
-    const td = (t: string, right?: boolean, mono?: boolean) =>
-      `<td style="padding:8px 12px;border-bottom:1px solid #E3E1D9${right?';text-align:right':''}${mono?";font-family:'Courier New',monospace":''}">${t}</td>`
+    const td = (t: string, right?: boolean, mono?: boolean, bold?: boolean) =>
+      `<td style="padding:8px 12px;border-bottom:1px solid #E3E1D9${right?';text-align:right':''}${mono?";font-family:'Courier New',monospace":''}${bold?';font-weight:700':''}">${t}</td>`
     const pos = (v: string) => `<span style="color:#0B7245;font-weight:600">${v}</span>`
+    const neg = (v: string) => `<span style="color:#B91C1C;font-weight:600">${v}</span>`
     const row = (cells: string, even?: boolean) =>
       `<tr style="background-color:${even?'#F9F8F5':'#fff'}">${cells}</tr>`
     const sectionHeader = (t: string) =>
       `<p style="font-weight:700;font-size:14px;margin:22px 0 4px;padding-bottom:4px;border-bottom:2px solid #1A1B2D">${t}</p>`
 
-    // Weekly Cash Receipts — summary only
-    const receiptsTable = tbl(
-      th('Division') + th('Amount', true),
+    const variance = d.combinedReceiptsTotal - d.thisWeekProjectedTotal
+    const positive = variance >= 0
+
+    // Weekly Cash Receipts — totals + target + variance
+    const receiptsRows =
       row(td('Legacy') + td(dollars(d.legacyReceiptsTotal), true, true)) +
       row(td('AB') + td(dollars(d.abReceiptsTotal), true, true), true) +
-      row(`<td style="padding:8px 12px;border-bottom:1px solid #E3E1D9;font-weight:700">Combined</td>` +
-        `<td style="padding:8px 12px;border-bottom:1px solid #E3E1D9;text-align:right;font-family:'Courier New',monospace">${pos(dollars(d.combinedReceiptsTotal))}</td>`)
+      row(td('Combined', false, false, true) + td(pos(dollars(d.combinedReceiptsTotal)), true, true)) +
+      (d.thisWeekProjectedTotal > 0
+        ? row(td('Target') + td(dollars(d.thisWeekProjectedTotal), true, true), true) +
+          row(td('Variance') + td(positive ? pos(`+${dollars(variance)}`) : neg(`(${dollars(Math.abs(variance))})`), true, true))
+        : '')
+    const receiptsTable = tbl(th('Division') + th('Amount', true), receiptsRows)
+
+    // Surety Breakdown
+    const suretySection = d.suretyBreakdown.length > 0 ? `
+${sectionHeader('Surety Breakdown')}
+${tbl(
+  th('Surety') + th('This Week Received', true) + th('Next Week Projected', true) + th('Future Projected', true),
+  d.suretyBreakdown.map((r, i) =>
+    row(
+      td(r.label) +
+      td(r.receiptsTotal > 0 ? dollars(r.receiptsTotal) : '$0.00', true, true) +
+      td(r.nextWeekTotal > 0 ? dollars(r.nextWeekTotal) : '$0.00', true, true) +
+      td(r.futureTotal > 0 ? dollars(r.futureTotal) : '$0.00', true, true),
+      i % 2 === 1
     )
+  ).join('')
+)}` : ''
 
     // Projected Payments Summary — one row per week
     const allSections = [
-      ...d.nextWeekSections.map(s => ({ ...s, label: 'Next Week' })),
-      ...d.futureSections.map(s => ({ ...s, label: 'Future' })),
+      ...d.nextWeekSections.map(s => ({ ...s })),
+      ...d.futureSections.map(s => ({ ...s })),
     ]
     const projTable = allSections.length > 0 ? tbl(
       th('Week Ending') + th('Legacy Projected', true) + th('AB Projected', true) + th('Combined', true),
       allSections.map((sec, i) =>
         row(
           td(sec.date) +
-          td(sec.legacyTotal > 0 ? dollars(sec.legacyTotal) : '—', true, true) +
-          td(sec.abTotal > 0 ? dollars(sec.abTotal) : '—', true, true) +
+          td(sec.legacyTotal > 0 ? dollars(sec.legacyTotal) : '$0.00', true, true) +
+          td(sec.abTotal > 0 ? dollars(sec.abTotal) : '$0.00', true, true) +
           td(pos(dollars(sec.legacyTotal + sec.abTotal)), true, true),
           i % 2 === 1
         )
@@ -126,31 +148,54 @@ export default function ReportPage() {
             .map(l => `<li style="margin-bottom:4px">${l.replace(/^[•\-\*]\s*/, '')}</li>`)
             .join('')
         }</ul>`
-      : '<p style="color:#6b7280;font-size:13px">No job-level notes recorded for this period.</p>'
+      : '<p style="color:#6b7280;font-size:13px">No notes recorded for this period.</p>'
+
+    // Status of Last Week's Projections — split by division
+    const lastWeekSection = (() => {
+      if (!d.lastWeekStatus.length) return ''
+      const legacyRows = d.lastWeekStatus.filter(r => r.division === 'LEGACY')
+      const abRows     = d.lastWeekStatus.filter(r => r.division === 'AB')
+      const statusTbl = (rows: typeof d.lastWeekStatus) => tbl(
+        th('Job') + th('Job Name') + th('Est #') + th('Amount', true) + th('Status') + th('Note'),
+        rows.map((r, i) => row(
+          td(r.jobNumber, false, true) +
+          td(r.jobName) +
+          td(r.estimateNumber) +
+          td(dollars(r.estimatedAmountOwed), true, true) +
+          `<td style="padding:8px 12px;border-bottom:1px solid #E3E1D9"><span style="padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;background-color:${r.statusColor}22;color:${r.statusColor}">${r.statusName}</span></td>` +
+          td(r.notes || '—'),
+          i % 2 === 1
+        )).join('')
+      )
+      return `
+${sectionHeader('Status of Last Week\'s Projections')}
+${legacyRows.length > 0 ? `<p style="font-weight:600;font-size:13px;margin:10px 0 4px;color:#475569">Legacy</p>${statusTbl(legacyRows)}` : ''}
+${abRows.length > 0 ? `<p style="font-weight:600;font-size:13px;margin:10px 0 4px;color:#3b5bdb">AB</p>${statusTbl(abRows)}` : ''}
+${legacyRows.length === 0 && abRows.length === 0 ? statusTbl(d.lastWeekStatus) : ''}`
+    })()
 
     // Received But Not Projected
-    const unplannedHtml = d.unplannedReceipts.length > 0 ? tbl(
-      th('Job #') + th('Job Name') + th('Date Received') + th('Amount', true),
-      d.unplannedReceipts.map((r, i) =>
-        row(
-          td(r.jobNumber, false, true) + td(r.jobName) + td(r.datePmtReceived) +
-          td(dollars(r.amountReceived), true, true),
-          i % 2 === 1
-        )
-      ).join('')
-    ) : '<p style="color:#6b7280;font-size:13px">None this period.</p>'
+    const unplannedSection = d.unplannedReceipts.length > 0 ? `
+${sectionHeader('Received But Not Projected')}
+${tbl(
+  th('Job') + th('Job Name') + th('Date Received') + th('Amount', true),
+  d.unplannedReceipts.map((r, i) =>
+    row(td(r.jobNumber, false, true) + td(r.jobName) + td(r.datePmtReceived) + td(dollars(r.amountReceived), true, true), i % 2 === 1)
+  ).join('')
+)}` : ''
 
     return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1A1B2D;max-width:680px">
 <p>Hello Leadership Team,</p>
 <p>Attached are this week's cash receipts and projected payment updates.</p>
 ${sectionHeader('Weekly Cash Receipts')}
 ${receiptsTable}
+${suretySection}
 ${sectionHeader('Projected Payments Summary')}
 ${projTable}
 ${sectionHeader('Key Notes')}
 ${keyNotesHtml}
-${sectionHeader('Received But Not Projected')}
-${unplannedHtml}
+${lastWeekSection}
+${unplannedSection}
 <p style="margin-top:24px">Please let me know if you have any questions.</p>
 <p>Thank you.</p>
 </div>`
