@@ -27,7 +27,6 @@ export default function ReportPage() {
   const [emailTab, setEmailTab] = useState<'preview' | 'source'>('preview')
   const [emailMode, setEmailMode] = useState<'standard' | 'ai'>('standard')
 
-  const [copied, setCopied] = useState<'html' | 'text' | null>(null)
   const [sendState, setSendState] = useState<'idle' | 'copied'>(('idle'))
   const mainRef = useRef<HTMLDivElement>(null)
 
@@ -260,13 +259,6 @@ ${opts?.closing ?? defaultClosing}
 </div>`
   }, [])
 
-  const openDrawer = useCallback(() => {
-    if (data && !emailHtml) setEmailHtml(buildStaticEmail(data))
-    setEmailMode('standard')
-    setEmailTab('preview')
-    setDrawerOpen(true)
-  }, [data, emailHtml, buildStaticEmail])
-
   const [generating, setGenerating] = useState(false)
 
   const generateAiEmail = useCallback(async () => {
@@ -287,23 +279,13 @@ ${opts?.closing ?? defaultClosing}
     }
   }, [data, date, buildAiStructuredEmail])
 
-  const resetToStandard = () => {
-    if (data) setEmailHtml(buildStaticEmail(data))
-    setEmailMode('standard')
+  const openDrawer = useCallback(async () => {
+    setDrawerOpen(true)
     setEmailTab('preview')
-  }
-
-  const copyHtml = async () => {
-    await navigator.clipboard.writeText(emailHtml)
-    setCopied('html'); setTimeout(() => setCopied(null), 2200)
-  }
-
-  const copyText = async () => {
-    const div = document.createElement('div')
-    div.innerHTML = emailHtml
-    await navigator.clipboard.writeText(div.innerText)
-    setCopied('text'); setTimeout(() => setCopied(null), 2200)
-  }
+    if (!emailHtml) {
+      await generateAiEmail()
+    }
+  }, [emailHtml, generateAiEmail])
 
   const printEmail = () => {
     const win = window.open('', '_blank')!
@@ -528,33 +510,16 @@ ${opts?.closing ?? defaultClosing}
 
             {/* Footer */}
             <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-200 flex-none flex-wrap">
-              {/* Left: AI controls */}
-              {emailMode === 'standard' ? (
-                <button onClick={generateAiEmail} disabled={generating}
-                  className="flex items-center gap-1.5 text-sm font-medium bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-700 disabled:opacity-60 transition-colors">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                  {generating ? 'Generating…' : 'Enhance with AI'}
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <button onClick={resetToStandard} disabled={generating} className="text-sm text-gray-500 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-60 transition-colors">Use Standard</button>
-                  <button onClick={generateAiEmail} disabled={generating} className="text-sm text-gray-500 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-60 transition-colors">
-                    {generating ? 'Generating…' : 'Regenerate'}
-                  </button>
-                </div>
-              )}
+              <button onClick={generateAiEmail} disabled={generating}
+                className="flex items-center gap-1.5 text-sm text-gray-500 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-60 transition-colors">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                {generating ? 'Regenerating…' : 'Regenerate'}
+              </button>
               <div className="flex-1" />
-              {/* Right: export */}
-              {[
-                { label: 'Print', action: printEmail },
-                { label: copied === 'html' ? '✓ Copied!' : 'Copy HTML', action: copyHtml },
-                { label: copied === 'text' ? '✓ Copied!' : 'Copy Text', action: copyText },
-              ].map(btn => (
-                <button key={btn.label} onClick={btn.action}
-                  className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap">
-                  {btn.label}
-                </button>
-              ))}
+              <button onClick={printEmail}
+                className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap">
+                Print
+              </button>
               <button
                 onClick={sendEmail}
                 className={`text-xs px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium ${sendState === 'copied' ? 'bg-green-600 text-white border border-green-600' : 'bg-slate-900 text-white hover:bg-slate-700 border border-slate-900'}`}
