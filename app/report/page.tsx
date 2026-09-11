@@ -28,6 +28,7 @@ export default function ReportPage() {
   const [emailMode, setEmailMode] = useState<'standard' | 'ai'>('standard')
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied] = useState<'html' | 'text' | null>(null)
+  const [sendState, setSendState] = useState<'idle' | 'copied'>(('idle'))
   const mainRef = useRef<HTMLDivElement>(null)
 
   const isFriday = (s: string) => { const [y,m,d] = s.split('-').map(Number); return new Date(Date.UTC(y,m-1,d)).getUTCDay() === 5 }
@@ -177,11 +178,25 @@ ${d.nextWeekSections.length > 0 ? `<p style="font-weight:600;margin:18px 0 4px">
     win.document.close(); win.focus(); setTimeout(() => win.print(), 400)
   }
 
-  const sendEmail = () => {
+  const sendEmail = async () => {
     const div = document.createElement('div'); div.innerHTML = emailHtml
-    const subject = encodeURIComponent(`Weekly AR Report — ${fmtDate(date)}`)
-    const body = encodeURIComponent(div.innerText)
-    window.location.href = `mailto:?subject=${subject}&body=${body}`
+    const subject = `Weekly AR Report — ${fmtDate(date)}`
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([emailHtml], { type: 'text/html' }),
+          'text/plain': new Blob([div.innerText], { type: 'text/plain' }),
+        }),
+      ])
+      setSendState('copied')
+      setTimeout(() => setSendState('idle'), 4000)
+    } catch {
+      // ClipboardItem not supported — fall back to plain text
+      await navigator.clipboard.writeText(div.innerText)
+      setSendState('copied')
+      setTimeout(() => setSendState('idle'), 4000)
+    }
+    window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subject)}`, '_blank')
   }
 
   const nextWeekTotal = data?.nextWeekSections.reduce((s, sec) => s + sec.legacyTotal + sec.abTotal, 0) ?? 0
@@ -399,7 +414,6 @@ ${d.nextWeekSections.length > 0 ? `<p style="font-weight:600;margin:18px 0 4px">
               {/* Right: export */}
               {[
                 { label: 'Print', action: printEmail },
-                { label: 'Send', action: sendEmail },
                 { label: copied === 'html' ? '✓ Copied!' : 'Copy HTML', action: copyHtml },
                 { label: copied === 'text' ? '✓ Copied!' : 'Copy Text', action: copyText },
               ].map(btn => (
@@ -408,6 +422,12 @@ ${d.nextWeekSections.length > 0 ? `<p style="font-weight:600;margin:18px 0 4px">
                   {btn.label}
                 </button>
               ))}
+              <button
+                onClick={sendEmail}
+                className={`text-xs px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium ${sendState === 'copied' ? 'bg-green-600 text-white border border-green-600' : 'bg-slate-900 text-white hover:bg-slate-700 border border-slate-900'}`}
+              >
+                {sendState === 'copied' ? '✓ Copied — paste into Gmail' : 'Send via Gmail'}
+              </button>
             </div>
           </div>
         </div>
