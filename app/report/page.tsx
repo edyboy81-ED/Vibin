@@ -67,46 +67,93 @@ export default function ReportPage() {
 
   const toggleCollapse = (id: string) => setCollapsed(p => ({ ...p, [id]: !p[id] }))
 
-  // Generate an enhanced narrative intro/closing using the actual data
-  const buildEnhancedNarrative = useCallback((d: ReportResponse): { intro: string; closing: string } => {
-    const variance = d.combinedReceiptsTotal - d.thisWeekProjectedTotal
-    const pct = d.thisWeekProjectedTotal > 0 ? Math.abs(variance / d.thisWeekProjectedTotal * 100) : null
-    const positive = variance >= 0
-    const nextTotal = d.nextWeekSections.reduce((s, sec) => s + sec.legacyTotal + sec.abTotal, 0)
+  // Build the AI-structured email following the leadership prompt format
+  const buildAiStructuredEmail = useCallback((d: ReportResponse, keyNotes: string) => {
+    const th = (t: string, right?: boolean) =>
+      `<th style="background-color:#1A1B2D;color:#fff;padding:8px 12px;text-align:${right?'right':'left'};font-size:11px;letter-spacing:.06em;text-transform:uppercase">${t}</th>`
+    const tbl = (head: string, body: string) =>
+      `<table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:13px;margin:10px 0 18px"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
+    const td = (t: string, right?: boolean, mono?: boolean) =>
+      `<td style="padding:8px 12px;border-bottom:1px solid #E3E1D9${right?';text-align:right':''}${mono?";font-family:'Courier New',monospace":''}">${t}</td>`
+    const pos = (v: string) => `<span style="color:#0B7245;font-weight:600">${v}</span>`
+    const row = (cells: string, even?: boolean) =>
+      `<tr style="background-color:${even?'#F9F8F5':'#fff'}">${cells}</tr>`
+    const sectionHeader = (t: string) =>
+      `<p style="font-weight:700;font-size:14px;margin:22px 0 4px;padding-bottom:4px;border-bottom:2px solid #1A1B2D">${t}</p>`
 
-    let intro = `<p>Hi Team,</p>`
+    // Weekly Cash Receipts — summary only
+    const receiptsTable = tbl(
+      th('Division') + th('Amount', true),
+      row(td('Legacy') + td(dollars(d.legacyReceiptsTotal), true, true)) +
+      row(td('AB') + td(dollars(d.abReceiptsTotal), true, true), true) +
+      row(`<td style="padding:8px 12px;border-bottom:1px solid #E3E1D9;font-weight:700">Combined</td>` +
+        `<td style="padding:8px 12px;border-bottom:1px solid #E3E1D9;text-align:right;font-family:'Courier New',monospace">${pos(dollars(d.combinedReceiptsTotal))}</td>`)
+    )
 
-    if (d.thisWeekProjectedTotal > 0) {
-      const performance = positive
-        ? `We had a <strong>strong finish</strong> — combined collections of <strong style="color:#0B7245">${dollars(d.combinedReceiptsTotal)}</strong> came in ${pct!.toFixed(1)}% above our ${dollars(d.thisWeekProjectedTotal)} target.`
-        : `Combined collections landed at <strong>${dollars(d.combinedReceiptsTotal)}</strong> this week, ${pct!.toFixed(1)}% short of our ${dollars(d.thisWeekProjectedTotal)} target.`
-      intro += `<p>${performance}</p>`
-    } else {
-      intro += `<p>Here's your AR summary for the week ending ${fmtDate(d.reportDate)}. Combined collections came in at <strong style="color:#0B7245">${dollars(d.combinedReceiptsTotal)}</strong>.</p>`
-    }
+    // Projected Payments Summary — one row per week
+    const allSections = [
+      ...d.nextWeekSections.map(s => ({ ...s, label: 'Next Week' })),
+      ...d.futureSections.map(s => ({ ...s, label: 'Future' })),
+    ]
+    const projTable = allSections.length > 0 ? tbl(
+      th('Week Ending') + th('Legacy Projected', true) + th('AB Projected', true) + th('Combined', true),
+      allSections.map((sec, i) =>
+        row(
+          td(sec.date) +
+          td(sec.legacyTotal > 0 ? dollars(sec.legacyTotal) : '—', true, true) +
+          td(sec.abTotal > 0 ? dollars(sec.abTotal) : '—', true, true) +
+          td(pos(dollars(sec.legacyTotal + sec.abTotal)), true, true),
+          i % 2 === 1
+        )
+      ).join('') +
+      (() => {
+        const legTotal = allSections.reduce((s, sec) => s + sec.legacyTotal, 0)
+        const abTotal  = allSections.reduce((s, sec) => s + sec.abTotal, 0)
+        return `<tr style="background:#f0f0f0">
+          <td style="padding:8px 12px;font-weight:700">Total</td>
+          <td style="padding:8px 12px;text-align:right;font-family:'Courier New',monospace;font-weight:600">${dollars(legTotal)}</td>
+          <td style="padding:8px 12px;text-align:right;font-family:'Courier New',monospace;font-weight:600">${dollars(abTotal)}</td>
+          <td style="padding:8px 12px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${pos(dollars(legTotal + abTotal))}</td>
+        </tr>`
+      })()
+    ) : '<p style="color:#6b7280;font-size:13px">No projected payments on file.</p>'
 
-    const callouts: string[] = []
-    if (d.movedOut.length > 0) {
-      const movedTotal = d.movedOut.reduce((s, r) => s + r.estimatedAmountOwed, 0)
-      callouts.push(`${d.movedOut.length} projection${d.movedOut.length > 1 ? 's' : ''} totaling <strong>${dollars(movedTotal)}</strong> moved to a future date`)
-    }
-    if (d.dueNotReceived.length > 0) {
-      const dueTotal = d.dueNotReceived.reduce((s, r) => s + r.estimatedAmountOwed, 0)
-      callouts.push(`<strong>${dollars(dueTotal)}</strong> across ${d.dueNotReceived.length} job${d.dueNotReceived.length > 1 ? 's' : ''} is still expected this week`)
-    }
-    if (d.unplannedReceipts.length > 0) {
-      const unplannedTotal = d.unplannedReceipts.reduce((s, r) => s + r.amountReceived, 0)
-      callouts.push(`<strong>${dollars(unplannedTotal)}</strong> came in from ${d.unplannedReceipts.length} unplanned receipt${d.unplannedReceipts.length > 1 ? 's' : ''}`)
-    }
-    if (callouts.length > 0) {
-      intro += `<p>A few items worth noting: ${callouts.join('; ')}.</p>`
-    }
+    // Key Notes — AI bullets rendered as styled list
+    const keyNotesHtml = keyNotes
+      ? `<ul style="margin:8px 0 0;padding-left:20px;line-height:1.8">${
+          keyNotes.split('\n')
+            .filter(l => l.trim())
+            .map(l => `<li style="margin-bottom:4px">${l.replace(/^[•\-\*]\s*/, '')}</li>`)
+            .join('')
+        }</ul>`
+      : '<p style="color:#6b7280;font-size:13px">No job-level notes recorded for this period.</p>'
 
-    const closing = nextTotal > 0
-      ? `<p>Looking ahead, we have <strong>${dollars(nextTotal)}</strong> projected for next week. Details are in the tables below.</p><p>Have a great weekend!</p><p>— AR Team</p>`
-      : `<p>Details are in the tables below. Have a great weekend!</p><p>— AR Team</p>`
+    // Received But Not Projected
+    const unplannedHtml = d.unplannedReceipts.length > 0 ? tbl(
+      th('Job #') + th('Job Name') + th('Date Received') + th('Amount', true),
+      d.unplannedReceipts.map((r, i) =>
+        row(
+          td(r.jobNumber, false, true) + td(r.jobName) + td(r.datePmtReceived) +
+          td(dollars(r.amountReceived), true, true),
+          i % 2 === 1
+        )
+      ).join('')
+    ) : '<p style="color:#6b7280;font-size:13px">None this period.</p>'
 
-    return { intro, closing }
+    return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1A1B2D;max-width:680px">
+<p>Hello Leadership Team,</p>
+<p>Attached are this week's cash receipts and projected payment updates.</p>
+${sectionHeader('Weekly Cash Receipts')}
+${receiptsTable}
+${sectionHeader('Projected Payments Summary')}
+${projTable}
+${sectionHeader('Key Notes')}
+${keyNotesHtml}
+${sectionHeader('Received But Not Projected')}
+${unplannedHtml}
+<p style="margin-top:24px">Please let me know if you have any questions.</p>
+<p>Thank you.</p>
+</div>`
   }, [])
 
   // Build static HTML email from report data
@@ -175,13 +222,25 @@ ${opts?.closing ?? defaultClosing}
     setDrawerOpen(true)
   }, [data, emailHtml, buildStaticEmail])
 
-  const generateAiEmail = useCallback(() => {
+  const [generating, setGenerating] = useState(false)
+
+  const generateAiEmail = useCallback(async () => {
     if (!data) return
-    const { intro, closing } = buildEnhancedNarrative(data)
-    setEmailHtml(buildStaticEmail(data, { intro, closing }))
-    setEmailMode('ai')
-    setEmailTab('preview')
-  }, [data, buildEnhancedNarrative, buildStaticEmail])
+    setGenerating(true)
+    try {
+      const res = await fetch('/api/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date }),
+      })
+      const json = await res.json()
+      setEmailHtml(buildAiStructuredEmail(data, json.keyNotes ?? ''))
+      setEmailMode('ai')
+      setEmailTab('preview')
+    } finally {
+      setGenerating(false)
+    }
+  }, [data, date, buildAiStructuredEmail])
 
   const resetToStandard = () => {
     if (data) setEmailHtml(buildStaticEmail(data))
@@ -426,16 +485,16 @@ ${opts?.closing ?? defaultClosing}
             <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-200 flex-none flex-wrap">
               {/* Left: AI controls */}
               {emailMode === 'standard' ? (
-                <button onClick={generateAiEmail}
-                  className="flex items-center gap-1.5 text-sm font-medium bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-700 transition-colors">
+                <button onClick={generateAiEmail} disabled={generating}
+                  className="flex items-center gap-1.5 text-sm font-medium bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-700 disabled:opacity-60 transition-colors">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                  Enhance with AI
+                  {generating ? 'Generating…' : 'Enhance with AI'}
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
-                  <button onClick={resetToStandard} className="text-sm text-gray-500 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">Use Standard</button>
-                  <button onClick={generateAiEmail} className="text-sm text-gray-500 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
-                    Regenerate
+                  <button onClick={resetToStandard} disabled={generating} className="text-sm text-gray-500 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-60 transition-colors">Use Standard</button>
+                  <button onClick={generateAiEmail} disabled={generating} className="text-sm text-gray-500 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-60 transition-colors">
+                    {generating ? 'Generating…' : 'Regenerate'}
                   </button>
                 </div>
               )}
