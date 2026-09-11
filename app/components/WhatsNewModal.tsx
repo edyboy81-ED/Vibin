@@ -2,9 +2,25 @@
 
 import { useState } from 'react'
 
-const VERSION = 'v1.6.0'
+const VERSION = 'v1.7.0'
 
 const CHANGELOG = [
+  {
+    version: 'v1.7.0',
+    date: 'September 11, 2026',
+    title: 'Surety Tracking, Friday Report Redesign & AI Email',
+    changes: [
+      'Surety — jobs and projections now track surety bond type (Zurich, Berkshire, Markel, Unbonded)',
+      'Surety — Friday Report includes a Surety Breakdown table showing receipts, next-week, and future pipeline per bond',
+      'Surety — Projections grid shows surety as a column; filter by surety on Jobs and Projections pages',
+      'Surety — Bulk import tool: upload a CSV of Job # + Surety to assign bonds to all existing jobs at once',
+      'Archived status — fully paid projections move to Archived instead of Received; archived items hidden by default with a "Show archived" toggle',
+      'Friday Report — fully redesigned with sticky top bar, scrollspy left nav, collapsible sections, and performance hero card with progress bar',
+      'Friday Report — Email Draft generates a leadership-ready email instantly using AI (Claude): Weekly Cash Receipts, Surety Breakdown, Projected Payments Summary, Key Notes synthesized from job notes, Status of Last Week\'s Projections, and Received But Not Projected',
+      'Email Draft — Send via Gmail copies the formatted HTML email to clipboard and opens Gmail compose with the subject pre-filled; formatting is preserved when pasted',
+      'Dashboard theme — theme selection now applies to the nav bar and page background, not just the dashboard cards; theme persists across page loads with no flash',
+    ],
+  },
   {
     version: 'v1.6.0',
     date: 'June 19, 2026',

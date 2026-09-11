@@ -150,8 +150,8 @@ const THEMES: Record<ThemeId, ThemeConfig> = {
   },
 }
 
-export default function DashboardView({ data: d }: { data: DashboardData }) {
-  const [themeId, setThemeId] = useState<ThemeId>('slate-emerald')
+export default function DashboardView({ data: d, initialTheme }: { data: DashboardData; initialTheme?: ThemeId }) {
+  const [themeId, setThemeId] = useState<ThemeId>(initialTheme ?? 'slate-emerald')
 
   useEffect(() => {
     const saved = localStorage.getItem('vibin-dashboard-theme') as ThemeId | null

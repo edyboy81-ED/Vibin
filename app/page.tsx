@@ -1,5 +1,9 @@
 import { prisma } from '@/lib/db'
+import { cookies } from 'next/headers'
 import DashboardView from './components/DashboardView'
+
+type ThemeId = 'slate-emerald' | 'white-indigo' | 'dark-mode' | 'warm-neutral'
+const VALID_THEMES: ThemeId[] = ['slate-emerald', 'white-indigo', 'dark-mode', 'warm-neutral']
 
 export default async function DashboardPage() {
   const today = new Date()
@@ -48,8 +52,12 @@ export default async function DashboardPage() {
   const weekLegacy = weekLegacyJobs.reduce((s, j) => s + j.payments.reduce((ps, p) => ps + p.amountReceived, 0), 0)
   const weekAB = weekABJobs.reduce((s, j) => s + j.payments.reduce((ps, p) => ps + p.amountReceived, 0), 0)
 
+  const cookieStore = await cookies()
+  const themeCookie = cookieStore.get('vibin-dashboard-theme')?.value as ThemeId | undefined
+  const initialTheme = themeCookie && VALID_THEMES.includes(themeCookie) ? themeCookie : 'slate-emerald'
+
   return (
-    <DashboardView data={{
+    <DashboardView initialTheme={initialTheme} data={{
       friday: friday.toISOString(),
       weekLegacy,
       weekAB,

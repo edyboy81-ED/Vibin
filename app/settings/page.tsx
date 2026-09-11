@@ -35,6 +35,7 @@ export default function SettingsPage() {
   const selectTheme = (id: ThemeId) => {
     setActiveTheme(id)
     localStorage.setItem('vibin-dashboard-theme', id)
+    document.cookie = `vibin-dashboard-theme=${id}; path=/; max-age=31536000; SameSite=Lax`
   }
 
   const fetchStatuses = useCallback(async () => {

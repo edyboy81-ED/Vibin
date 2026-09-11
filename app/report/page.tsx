@@ -26,8 +26,8 @@ export default function ReportPage() {
   const [emailHtml, setEmailHtml] = useState('')
   const [emailTab, setEmailTab] = useState<'preview' | 'source'>('preview')
   const [emailMode, setEmailMode] = useState<'standard' | 'ai'>('standard')
-  const [generating, setGenerating] = useState(false)
-  const [copied, setCopied] = useState<'html' | 'text' | null>(null)
+
+  const [sendState, setSendState] = useState<'idle' | 'copied'>(('idle'))
   const mainRef = useRef<HTMLDivElement>(null)
 
   const isFriday = (s: string) => { const [y,m,d] = s.split('-').map(Number); return new Date(Date.UTC(y,m-1,d)).getUTCDay() === 5 }
@@ -66,8 +66,142 @@ export default function ReportPage() {
 
   const toggleCollapse = (id: string) => setCollapsed(p => ({ ...p, [id]: !p[id] }))
 
+  // Build the AI-structured email following the leadership prompt format
+  const buildAiStructuredEmail = useCallback((d: ReportResponse, keyNotes: string) => {
+    const th = (t: string, right?: boolean) =>
+      `<th style="background-color:#1A1B2D;color:#fff;padding:8px 12px;text-align:${right?'right':'left'};font-size:11px;letter-spacing:.06em;text-transform:uppercase">${t}</th>`
+    const tbl = (head: string, body: string) =>
+      `<table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:13px;margin:10px 0 18px"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
+    const td = (t: string, right?: boolean, mono?: boolean, bold?: boolean) =>
+      `<td style="padding:8px 12px;border-bottom:1px solid #E3E1D9${right?';text-align:right':''}${mono?";font-family:'Courier New',monospace":''}${bold?';font-weight:700':''}">${t}</td>`
+    const pos = (v: string) => `<span style="color:#0B7245;font-weight:600">${v}</span>`
+    const neg = (v: string) => `<span style="color:#B91C1C;font-weight:600">${v}</span>`
+    const row = (cells: string, even?: boolean) =>
+      `<tr style="background-color:${even?'#F9F8F5':'#fff'}">${cells}</tr>`
+    const sectionHeader = (t: string) =>
+      `<p style="font-weight:700;font-size:14px;margin:22px 0 4px;padding-bottom:4px;border-bottom:2px solid #1A1B2D">${t}</p>`
+
+    const variance = d.combinedReceiptsTotal - d.thisWeekProjectedTotal
+    const positive = variance >= 0
+
+    // Weekly Cash Receipts — totals + target + variance
+    const receiptsRows =
+      row(td('Legacy') + td(dollars(d.legacyReceiptsTotal), true, true)) +
+      row(td('AB') + td(dollars(d.abReceiptsTotal), true, true), true) +
+      row(td('Combined', false, false, true) + td(pos(dollars(d.combinedReceiptsTotal)), true, true)) +
+      (d.thisWeekProjectedTotal > 0
+        ? row(td('Target') + td(dollars(d.thisWeekProjectedTotal), true, true), true) +
+          row(td('Variance') + td(positive ? pos(`+${dollars(variance)}`) : neg(`(${dollars(Math.abs(variance))})`), true, true))
+        : '')
+    const receiptsTable = tbl(th('Division') + th('Amount', true), receiptsRows)
+
+    // Surety Breakdown
+    const suretySection = d.suretyBreakdown.length > 0 ? `
+${sectionHeader('Surety Breakdown')}
+${tbl(
+  th('Surety') + th('This Week Received', true) + th('Next Week Projected', true) + th('Future Projected', true),
+  d.suretyBreakdown.map((r, i) =>
+    row(
+      td(r.label) +
+      td(r.receiptsTotal > 0 ? dollars(r.receiptsTotal) : '$0.00', true, true) +
+      td(r.nextWeekTotal > 0 ? dollars(r.nextWeekTotal) : '$0.00', true, true) +
+      td(r.futureTotal > 0 ? dollars(r.futureTotal) : '$0.00', true, true),
+      i % 2 === 1
+    )
+  ).join('')
+)}` : ''
+
+    // Projected Payments Summary — one row per week
+    const allSections = [
+      ...d.nextWeekSections.map(s => ({ ...s })),
+      ...d.futureSections.map(s => ({ ...s })),
+    ]
+    const projTable = allSections.length > 0 ? tbl(
+      th('Week Ending') + th('Legacy Projected', true) + th('AB Projected', true) + th('Combined', true),
+      allSections.map((sec, i) =>
+        row(
+          td(sec.date) +
+          td(sec.legacyTotal > 0 ? dollars(sec.legacyTotal) : '$0.00', true, true) +
+          td(sec.abTotal > 0 ? dollars(sec.abTotal) : '$0.00', true, true) +
+          td(pos(dollars(sec.legacyTotal + sec.abTotal)), true, true),
+          i % 2 === 1
+        )
+      ).join('') +
+      (() => {
+        const legTotal = allSections.reduce((s, sec) => s + sec.legacyTotal, 0)
+        const abTotal  = allSections.reduce((s, sec) => s + sec.abTotal, 0)
+        return `<tr style="background:#f0f0f0">
+          <td style="padding:8px 12px;font-weight:700">Total</td>
+          <td style="padding:8px 12px;text-align:right;font-family:'Courier New',monospace;font-weight:600">${dollars(legTotal)}</td>
+          <td style="padding:8px 12px;text-align:right;font-family:'Courier New',monospace;font-weight:600">${dollars(abTotal)}</td>
+          <td style="padding:8px 12px;text-align:right;font-family:'Courier New',monospace;font-weight:700">${pos(dollars(legTotal + abTotal))}</td>
+        </tr>`
+      })()
+    ) : '<p style="color:#6b7280;font-size:13px">No projected payments on file.</p>'
+
+    // Key Notes — AI bullets rendered as styled list
+    const keyNotesHtml = keyNotes
+      ? `<ul style="margin:8px 0 0;padding-left:20px;line-height:1.8">${
+          keyNotes.split('\n')
+            .filter(l => l.trim())
+            .map(l => `<li style="margin-bottom:4px">${l.replace(/^[•\-\*]\s*/, '')}</li>`)
+            .join('')
+        }</ul>`
+      : '<p style="color:#6b7280;font-size:13px">No notes recorded for this period.</p>'
+
+    // Status of Last Week's Projections — split by division
+    const lastWeekSection = (() => {
+      if (!d.lastWeekStatus.length) return ''
+      const legacyRows = d.lastWeekStatus.filter(r => r.division === 'LEGACY')
+      const abRows     = d.lastWeekStatus.filter(r => r.division === 'AB')
+      const statusTbl = (rows: typeof d.lastWeekStatus) => tbl(
+        th('Job') + th('Job Name') + th('Est #') + th('Amount', true) + th('Status') + th('Note'),
+        rows.map((r, i) => row(
+          td(r.jobNumber, false, true) +
+          td(r.jobName) +
+          td(r.estimateNumber) +
+          td(dollars(r.estimatedAmountOwed), true, true) +
+          `<td style="padding:8px 12px;border-bottom:1px solid #E3E1D9"><span style="padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;background-color:${r.statusColor}22;color:${r.statusColor}">${r.statusName}</span></td>` +
+          td(r.notes || '—'),
+          i % 2 === 1
+        )).join('')
+      )
+      return `
+${sectionHeader('Status of Last Week\'s Projections')}
+${legacyRows.length > 0 ? `<p style="font-weight:600;font-size:13px;margin:10px 0 4px;color:#475569">Legacy</p>${statusTbl(legacyRows)}` : ''}
+${abRows.length > 0 ? `<p style="font-weight:600;font-size:13px;margin:10px 0 4px;color:#3b5bdb">AB</p>${statusTbl(abRows)}` : ''}
+${legacyRows.length === 0 && abRows.length === 0 ? statusTbl(d.lastWeekStatus) : ''}`
+    })()
+
+    // Received But Not Projected
+    const unplannedSection = d.unplannedReceipts.length > 0 ? `
+${sectionHeader('Received But Not Projected')}
+${tbl(
+  th('Job') + th('Job Name') + th('Date Received') + th('Amount', true),
+  d.unplannedReceipts.map((r, i) =>
+    row(td(r.jobNumber, false, true) + td(r.jobName) + td(r.datePmtReceived) + td(dollars(r.amountReceived), true, true), i % 2 === 1)
+  ).join('')
+)}` : ''
+
+    return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1A1B2D;max-width:680px">
+<p>Hello Leadership Team,</p>
+<p>Attached are this week's cash receipts and projected payment updates.</p>
+${sectionHeader('Weekly Cash Receipts')}
+${receiptsTable}
+${suretySection}
+${sectionHeader('Projected Payments Summary')}
+${projTable}
+${sectionHeader('Key Notes')}
+${keyNotesHtml}
+${lastWeekSection}
+${unplannedSection}
+<p style="margin-top:24px">Please let me know if you have any questions.</p>
+<p>Thank you.</p>
+</div>`
+  }, [])
+
   // Build static HTML email from report data
-  const buildStaticEmail = useCallback((d: ReportResponse) => {
+  const buildStaticEmail = useCallback((d: ReportResponse, opts?: { intro?: string; closing?: string }) => {
     const variance = d.combinedReceiptsTotal - d.thisWeekProjectedTotal
     const pct = d.thisWeekProjectedTotal > 0 ? (variance / d.thisWeekProjectedTotal * 100).toFixed(1) : '0'
     const positive = variance >= 0
@@ -111,26 +245,23 @@ export default function ReportPage() {
       `<tr style="background:#f0f0f0"><td style="padding:8px 12px;font-weight:600">Total</td><td></td><td style="padding:8px 12px;text-align:right;font-family:'Courier New',monospace;font-weight:600">${pos(dollars(nextTotal))}</td></tr>`
     ) : ''
 
+    const defaultIntro = `<p>Hi Team,</p>
+<p>Here's your AR summary for the week ending ${fmtDate(d.reportDate)}. We collected <strong>${pos(dollars(d.combinedReceiptsTotal))}</strong> combined${d.thisWeekProjectedTotal > 0 ? ` — ${positive ? `${pct}% above` : `${Math.abs(Number(pct))}% below`} our ${dollars(d.thisWeekProjectedTotal)} target` : ''}.</p>`
+    const defaultClosing = `<p>Have a great weekend!</p>\n<p>— AR Team</p>`
+
     return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1A1B2D;max-width:680px">
-<p>Hi Team,</p>
-<p>Here's your AR summary for the week ending ${fmtDate(d.reportDate)}. We collected <strong>${pos(dollars(d.combinedReceiptsTotal))}</strong> combined${d.thisWeekProjectedTotal > 0 ? ` — ${positive ? `${pct}% above` : `${Math.abs(Number(pct))}% below`} our ${dollars(d.thisWeekProjectedTotal)} target` : ''}.</p>
+${opts?.intro ?? defaultIntro}
 <p style="font-weight:600;margin:18px 0 4px">Collections Summary</p>
 ${collectionsTable}
 ${d.suretyBreakdown.length > 0 ? `<p style="font-weight:600;margin:18px 0 4px">Surety Breakdown</p>${suretyTable}` : ''}
 ${d.nextWeekSections.length > 0 ? `<p style="font-weight:600;margin:18px 0 4px">Next Week Projections — ${dollars(nextTotal)} total</p>${nextTable}` : ''}
-<p>Have a great weekend!</p>
-<p>— AR Team</p>
+${opts?.closing ?? defaultClosing}
 </div>`
   }, [])
 
-  const openDrawer = useCallback(() => {
-    if (data && !emailHtml) setEmailHtml(buildStaticEmail(data))
-    setEmailMode('standard')
-    setEmailTab('preview')
-    setDrawerOpen(true)
-  }, [data, emailHtml, buildStaticEmail])
+  const [generating, setGenerating] = useState(false)
 
-  const generateAiEmail = async () => {
+  const generateAiEmail = useCallback(async () => {
     if (!data) return
     setGenerating(true)
     try {
@@ -139,37 +270,22 @@ ${d.nextWeekSections.length > 0 ? `<p style="font-weight:600;margin:18px 0 4px">
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date }),
       })
-      const d = await res.json()
-      if (d.emailBody) {
-        // Wrap plain text response in styled HTML
-        const lines = (d.emailBody as string).split('\n')
-        const htmlLines = lines.map(l => l.trim() === '' ? '<br>' : `<p style="margin:0 0 8px">${l}</p>`).join('')
-        setEmailHtml(`<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1A1B2D;max-width:680px">${htmlLines}</div>`)
-        setEmailMode('ai')
-        setEmailTab('preview')
-      }
+      const json = await res.json()
+      setEmailHtml(buildAiStructuredEmail(data, json.keyNotes ?? ''))
+      setEmailMode('ai')
+      setEmailTab('preview')
     } finally {
       setGenerating(false)
     }
-  }
+  }, [data, date, buildAiStructuredEmail])
 
-  const resetToStandard = () => {
-    if (data) setEmailHtml(buildStaticEmail(data))
-    setEmailMode('standard')
+  const openDrawer = useCallback(async () => {
+    setDrawerOpen(true)
     setEmailTab('preview')
-  }
-
-  const copyHtml = async () => {
-    await navigator.clipboard.writeText(emailHtml)
-    setCopied('html'); setTimeout(() => setCopied(null), 2200)
-  }
-
-  const copyText = async () => {
-    const div = document.createElement('div')
-    div.innerHTML = emailHtml
-    await navigator.clipboard.writeText(div.innerText)
-    setCopied('text'); setTimeout(() => setCopied(null), 2200)
-  }
+    if (!emailHtml) {
+      await generateAiEmail()
+    }
+  }, [emailHtml, generateAiEmail])
 
   const printEmail = () => {
     const win = window.open('', '_blank')!
@@ -177,11 +293,25 @@ ${d.nextWeekSections.length > 0 ? `<p style="font-weight:600;margin:18px 0 4px">
     win.document.close(); win.focus(); setTimeout(() => win.print(), 400)
   }
 
-  const sendEmail = () => {
+  const sendEmail = async () => {
     const div = document.createElement('div'); div.innerHTML = emailHtml
-    const subject = encodeURIComponent(`Weekly AR Report — ${fmtDate(date)}`)
-    const body = encodeURIComponent(div.innerText)
-    window.location.href = `mailto:?subject=${subject}&body=${body}`
+    const subject = `Weekly AR Report — ${fmtDate(date)}`
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([emailHtml], { type: 'text/html' }),
+          'text/plain': new Blob([div.innerText], { type: 'text/plain' }),
+        }),
+      ])
+      setSendState('copied')
+      setTimeout(() => setSendState('idle'), 4000)
+    } catch {
+      // ClipboardItem not supported — fall back to plain text
+      await navigator.clipboard.writeText(div.innerText)
+      setSendState('copied')
+      setTimeout(() => setSendState('idle'), 4000)
+    }
+    window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subject)}`, '_blank')
   }
 
   const nextWeekTotal = data?.nextWeekSections.reduce((s, sec) => s + sec.legacyTotal + sec.abTotal, 0) ?? 0
@@ -380,34 +510,22 @@ ${d.nextWeekSections.length > 0 ? `<p style="font-weight:600;margin:18px 0 4px">
 
             {/* Footer */}
             <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-200 flex-none flex-wrap">
-              {/* Left: AI controls */}
-              {emailMode === 'standard' ? (
-                <button onClick={generateAiEmail} disabled={generating}
-                  className="flex items-center gap-1.5 text-sm font-medium bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-700 disabled:opacity-50 transition-colors">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                  {generating ? 'Generating…' : 'Enhance with AI'}
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <button onClick={resetToStandard} className="text-sm text-gray-500 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">Use Standard</button>
-                  <button onClick={generateAiEmail} disabled={generating} className="text-sm text-gray-500 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors">
-                    {generating ? 'Generating…' : 'Regenerate'}
-                  </button>
-                </div>
-              )}
+              <button onClick={generateAiEmail} disabled={generating}
+                className="flex items-center gap-1.5 text-sm text-gray-500 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-60 transition-colors">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                {generating ? 'Regenerating…' : 'Regenerate'}
+              </button>
               <div className="flex-1" />
-              {/* Right: export */}
-              {[
-                { label: 'Print', action: printEmail },
-                { label: 'Send', action: sendEmail },
-                { label: copied === 'html' ? '✓ Copied!' : 'Copy HTML', action: copyHtml },
-                { label: copied === 'text' ? '✓ Copied!' : 'Copy Text', action: copyText },
-              ].map(btn => (
-                <button key={btn.label} onClick={btn.action}
-                  className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap">
-                  {btn.label}
-                </button>
-              ))}
+              <button onClick={printEmail}
+                className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap">
+                Print
+              </button>
+              <button
+                onClick={sendEmail}
+                className={`text-xs px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium ${sendState === 'copied' ? 'bg-green-600 text-white border border-green-600' : 'bg-slate-900 text-white hover:bg-slate-700 border border-slate-900'}`}
+              >
+                {sendState === 'copied' ? '✓ Copied — paste into Gmail' : 'Send via Gmail'}
+              </button>
             </div>
           </div>
         </div>
