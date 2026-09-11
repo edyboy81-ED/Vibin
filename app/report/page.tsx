@@ -26,7 +26,7 @@ export default function ReportPage() {
   const [emailHtml, setEmailHtml] = useState('')
   const [emailTab, setEmailTab] = useState<'preview' | 'source'>('preview')
   const [emailMode, setEmailMode] = useState<'standard' | 'ai'>('standard')
-  const [generating, setGenerating] = useState(false)
+
   const [copied, setCopied] = useState<'html' | 'text' | null>(null)
   const [sendState, setSendState] = useState<'idle' | 'copied'>(('idle'))
   const mainRef = useRef<HTMLDivElement>(null)
@@ -67,8 +67,50 @@ export default function ReportPage() {
 
   const toggleCollapse = (id: string) => setCollapsed(p => ({ ...p, [id]: !p[id] }))
 
+  // Generate an enhanced narrative intro/closing using the actual data
+  const buildEnhancedNarrative = useCallback((d: ReportResponse): { intro: string; closing: string } => {
+    const variance = d.combinedReceiptsTotal - d.thisWeekProjectedTotal
+    const pct = d.thisWeekProjectedTotal > 0 ? Math.abs(variance / d.thisWeekProjectedTotal * 100) : null
+    const positive = variance >= 0
+    const nextTotal = d.nextWeekSections.reduce((s, sec) => s + sec.legacyTotal + sec.abTotal, 0)
+
+    let intro = `<p>Hi Team,</p>`
+
+    if (d.thisWeekProjectedTotal > 0) {
+      const performance = positive
+        ? `We had a <strong>strong finish</strong> — combined collections of <strong style="color:#0B7245">${dollars(d.combinedReceiptsTotal)}</strong> came in ${pct!.toFixed(1)}% above our ${dollars(d.thisWeekProjectedTotal)} target.`
+        : `Combined collections landed at <strong>${dollars(d.combinedReceiptsTotal)}</strong> this week, ${pct!.toFixed(1)}% short of our ${dollars(d.thisWeekProjectedTotal)} target.`
+      intro += `<p>${performance}</p>`
+    } else {
+      intro += `<p>Here's your AR summary for the week ending ${fmtDate(d.reportDate)}. Combined collections came in at <strong style="color:#0B7245">${dollars(d.combinedReceiptsTotal)}</strong>.</p>`
+    }
+
+    const callouts: string[] = []
+    if (d.movedOut.length > 0) {
+      const movedTotal = d.movedOut.reduce((s, r) => s + r.estimatedAmountOwed, 0)
+      callouts.push(`${d.movedOut.length} projection${d.movedOut.length > 1 ? 's' : ''} totaling <strong>${dollars(movedTotal)}</strong> moved to a future date`)
+    }
+    if (d.dueNotReceived.length > 0) {
+      const dueTotal = d.dueNotReceived.reduce((s, r) => s + r.estimatedAmountOwed, 0)
+      callouts.push(`<strong>${dollars(dueTotal)}</strong> across ${d.dueNotReceived.length} job${d.dueNotReceived.length > 1 ? 's' : ''} is still expected this week`)
+    }
+    if (d.unplannedReceipts.length > 0) {
+      const unplannedTotal = d.unplannedReceipts.reduce((s, r) => s + r.amountReceived, 0)
+      callouts.push(`<strong>${dollars(unplannedTotal)}</strong> came in from ${d.unplannedReceipts.length} unplanned receipt${d.unplannedReceipts.length > 1 ? 's' : ''}`)
+    }
+    if (callouts.length > 0) {
+      intro += `<p>A few items worth noting: ${callouts.join('; ')}.</p>`
+    }
+
+    const closing = nextTotal > 0
+      ? `<p>Looking ahead, we have <strong>${dollars(nextTotal)}</strong> projected for next week. Details are in the tables below.</p><p>Have a great weekend!</p><p>— AR Team</p>`
+      : `<p>Details are in the tables below. Have a great weekend!</p><p>— AR Team</p>`
+
+    return { intro, closing }
+  }, [])
+
   // Build static HTML email from report data
-  const buildStaticEmail = useCallback((d: ReportResponse) => {
+  const buildStaticEmail = useCallback((d: ReportResponse, opts?: { intro?: string; closing?: string }) => {
     const variance = d.combinedReceiptsTotal - d.thisWeekProjectedTotal
     const pct = d.thisWeekProjectedTotal > 0 ? (variance / d.thisWeekProjectedTotal * 100).toFixed(1) : '0'
     const positive = variance >= 0
@@ -112,15 +154,17 @@ export default function ReportPage() {
       `<tr style="background:#f0f0f0"><td style="padding:8px 12px;font-weight:600">Total</td><td></td><td style="padding:8px 12px;text-align:right;font-family:'Courier New',monospace;font-weight:600">${pos(dollars(nextTotal))}</td></tr>`
     ) : ''
 
+    const defaultIntro = `<p>Hi Team,</p>
+<p>Here's your AR summary for the week ending ${fmtDate(d.reportDate)}. We collected <strong>${pos(dollars(d.combinedReceiptsTotal))}</strong> combined${d.thisWeekProjectedTotal > 0 ? ` — ${positive ? `${pct}% above` : `${Math.abs(Number(pct))}% below`} our ${dollars(d.thisWeekProjectedTotal)} target` : ''}.</p>`
+    const defaultClosing = `<p>Have a great weekend!</p>\n<p>— AR Team</p>`
+
     return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1A1B2D;max-width:680px">
-<p>Hi Team,</p>
-<p>Here's your AR summary for the week ending ${fmtDate(d.reportDate)}. We collected <strong>${pos(dollars(d.combinedReceiptsTotal))}</strong> combined${d.thisWeekProjectedTotal > 0 ? ` — ${positive ? `${pct}% above` : `${Math.abs(Number(pct))}% below`} our ${dollars(d.thisWeekProjectedTotal)} target` : ''}.</p>
+${opts?.intro ?? defaultIntro}
 <p style="font-weight:600;margin:18px 0 4px">Collections Summary</p>
 ${collectionsTable}
 ${d.suretyBreakdown.length > 0 ? `<p style="font-weight:600;margin:18px 0 4px">Surety Breakdown</p>${suretyTable}` : ''}
 ${d.nextWeekSections.length > 0 ? `<p style="font-weight:600;margin:18px 0 4px">Next Week Projections — ${dollars(nextTotal)} total</p>${nextTable}` : ''}
-<p>Have a great weekend!</p>
-<p>— AR Team</p>
+${opts?.closing ?? defaultClosing}
 </div>`
   }, [])
 
@@ -131,28 +175,13 @@ ${d.nextWeekSections.length > 0 ? `<p style="font-weight:600;margin:18px 0 4px">
     setDrawerOpen(true)
   }, [data, emailHtml, buildStaticEmail])
 
-  const generateAiEmail = async () => {
+  const generateAiEmail = useCallback(() => {
     if (!data) return
-    setGenerating(true)
-    try {
-      const res = await fetch('/api/report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date }),
-      })
-      const d = await res.json()
-      if (d.emailBody) {
-        // Wrap plain text response in styled HTML
-        const lines = (d.emailBody as string).split('\n')
-        const htmlLines = lines.map(l => l.trim() === '' ? '<br>' : `<p style="margin:0 0 8px">${l}</p>`).join('')
-        setEmailHtml(`<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1A1B2D;max-width:680px">${htmlLines}</div>`)
-        setEmailMode('ai')
-        setEmailTab('preview')
-      }
-    } finally {
-      setGenerating(false)
-    }
-  }
+    const { intro, closing } = buildEnhancedNarrative(data)
+    setEmailHtml(buildStaticEmail(data, { intro, closing }))
+    setEmailMode('ai')
+    setEmailTab('preview')
+  }, [data, buildEnhancedNarrative, buildStaticEmail])
 
   const resetToStandard = () => {
     if (data) setEmailHtml(buildStaticEmail(data))
@@ -397,16 +426,16 @@ ${d.nextWeekSections.length > 0 ? `<p style="font-weight:600;margin:18px 0 4px">
             <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-200 flex-none flex-wrap">
               {/* Left: AI controls */}
               {emailMode === 'standard' ? (
-                <button onClick={generateAiEmail} disabled={generating}
-                  className="flex items-center gap-1.5 text-sm font-medium bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-700 disabled:opacity-50 transition-colors">
+                <button onClick={generateAiEmail}
+                  className="flex items-center gap-1.5 text-sm font-medium bg-slate-900 text-white px-3 py-1.5 rounded-lg hover:bg-slate-700 transition-colors">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                  {generating ? 'Generating…' : 'Enhance with AI'}
+                  Enhance with AI
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
                   <button onClick={resetToStandard} className="text-sm text-gray-500 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">Use Standard</button>
-                  <button onClick={generateAiEmail} disabled={generating} className="text-sm text-gray-500 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors">
-                    {generating ? 'Generating…' : 'Regenerate'}
+                  <button onClick={generateAiEmail} className="text-sm text-gray-500 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+                    Regenerate
                   </button>
                 </div>
               )}
